@@ -3,9 +3,9 @@ import { authenticate } from '../../middleware/authenticate.js';
 import { authorize } from '../../middleware/authorize.js';
 
 describe('access middleware foundation', () => {
-  it('rejects unauthenticated requests', () => {
+  it('rejects unauthenticated requests', async () => {
     const next = vi.fn();
-    authenticate({}, {}, next);
+    await authenticate({}, {}, next);
     expect(next.mock.calls[0][0]).toMatchObject({ status: 401, code: 'AUTHENTICATION_REQUIRED' });
   });
 

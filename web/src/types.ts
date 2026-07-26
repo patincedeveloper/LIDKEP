@@ -1,5 +1,5 @@
 export type Role = 'SYSTEM_ADMINISTRATOR' | 'INNOVATOR' | 'EXPERT' | 'INVESTOR_PARTNER' | 'PUBLIC_USER';
-export type Account = { id: string; name: string; email: string; role: Role; accountStatus: string; organization: string; district: string; verified: boolean; mfaEnabled: boolean };
+export type Account = { id: string; name: string; email: string; role: Role; accountStatus: string; organization: string; district: string; verified: boolean; mfaEnabled: boolean; mustChangePassword: boolean };
 export type Metric = { value: string; label: string };
 export type Milestone = { title: string; date: string; status: string };
 export type Innovation = {
@@ -12,9 +12,8 @@ export type Assignment = { id: string; innovationId: string; innovation: string;
 export type Engagement = { id: string; innovation: string; partner: string; type: string; status: string; createdAt: string; summary: string };
 export type Notification = { id: string; title: string; message: string; time: string; read: boolean; type: string };
 export type Revision = { id: string; innovation: string; field: string; instruction: string; dueAt: string; status: string };
-export type DemoData = {
-  roles: Role[];
-  demoAccounts: Account[];
+export type PlatformData = {
+  users: Account[];
   taxonomies: { sectors: string[]; categories: string[]; districts: string[]; maturityLevels: string[]; impactAreas: string[] };
   innovations: Innovation[];
   assignments: Assignment[];

@@ -1,50 +1,131 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import type { DemoData, Role } from './types';
+import type { Account, PlatformData, Role } from './types';
 
-type DemoContextValue = {
-  data: DemoData | null;
-  loading: boolean;
-  error: string;
-  role: Role;
-  setRole: (role: Role) => void;
-  notify: (message: string) => void;
-  toast: string;
+type RegisterInput = {
+  email: string;
+  password: string;
+  displayName: string;
+  organization?: string;
+  district?: string;
+  role: Exclude<Role, 'SYSTEM_ADMINISTRATOR'>;
 };
 
-const DemoContext = createContext<DemoContextValue | null>(null);
+type PlatformContextValue = {
+  data: PlatformData | null;
+  user: Account | null;
+  role: Role;
+  loading: boolean;
+  error: string;
+  toast: string;
+  notify: (message: string) => void;
+  login: (email: string, password: string) => Promise<Account>;
+  register: (input: RegisterInput) => Promise<{ user: Account; requiresApproval: boolean }>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  logout: () => Promise<void>;
+};
 
-export function DemoProvider({ children }: { children: React.ReactNode }) {
-  const [data, setData] = useState<DemoData | null>(null);
+const PlatformContext = createContext<PlatformContextValue | null>(null);
+
+async function apiRequest(path: string, options: RequestInit = {}) {
+  const response = await fetch(path, {
+    credentials: 'include',
+    headers: { 'content-type': 'application/json', ...options.headers },
+    ...options
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.error?.message ?? 'The request could not be completed.');
+  return payload.data;
+}
+
+export function PlatformProvider({ children }: { children: React.ReactNode }) {
+  const [data, setData] = useState<PlatformData | null>(null);
+  const [user, setUser] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
-  const [role, setRoleState] = useState<Role>(() => (localStorage.getItem('lidkep-demo-role') as Role) || 'INNOVATOR');
+
+  const loadAuthenticatedData = async () => {
+    const workspace = await apiRequest('/api/v1/auth/bootstrap');
+    setData(workspace);
+  };
 
   useEffect(() => {
-    fetch('/api/v1/demo/bootstrap')
-      .then((response) => {
-        if (!response.ok) throw new Error('Unable to load the demo workspace.');
-        return response.json();
+    Promise.all([
+      apiRequest('/api/v1/public/bootstrap'),
+      apiRequest('/api/v1/auth/me').catch(() => null)
+    ])
+      .then(async ([publicData, identity]) => {
+        setData({ ...publicData, users: [], assignments: [], reviews: [], revisions: [], engagements: [], notifications: [], verifications: [], auditLogs: [], criteria: [] });
+        if (identity?.user) {
+          setUser(identity.user);
+          await loadAuthenticatedData();
+        }
       })
-      .then((payload) => setData(payload.data))
       .catch((cause: Error) => setError(cause.message))
       .finally(() => setLoading(false));
   }, []);
 
-  const setRole = (nextRole: Role) => {
-    localStorage.setItem('lidkep-demo-role', nextRole);
-    setRoleState(nextRole);
+  const login = async (email: string, password: string) => {
+    const result = await apiRequest('/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+    setUser(result.user);
+    await loadAuthenticatedData();
+    return result.user;
   };
+
+  const register = async (input: RegisterInput) => {
+    const result = await apiRequest('/api/v1/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+    if (!result.requiresApproval) {
+      setUser(result.user);
+      await loadAuthenticatedData();
+    }
+    return result;
+  };
+
+  const logout = async () => {
+    await apiRequest('/api/v1/auth/logout', { method: 'POST', body: '{}' });
+    setUser(null);
+    const publicData = await apiRequest('/api/v1/public/bootstrap');
+    setData({ ...publicData, users: [], assignments: [], reviews: [], revisions: [], engagements: [], notifications: [], verifications: [], auditLogs: [], criteria: [] });
+  };
+
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    await apiRequest('/api/v1/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+    setUser(null);
+    const publicData = await apiRequest('/api/v1/public/bootstrap');
+    setData({ ...publicData, users: [], assignments: [], reviews: [], revisions: [], engagements: [], notifications: [], verifications: [], auditLogs: [], criteria: [] });
+  };
+
   const notify = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(''), 3200);
   };
-  const value = useMemo(() => ({ data, loading, error, role, setRole, notify, toast }), [data, loading, error, role, toast]);
-  return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;
+  const value = useMemo(() => ({
+    data,
+    user,
+    role: user?.role ?? 'PUBLIC_USER',
+    loading,
+    error,
+    toast,
+    notify,
+    login,
+    register,
+    changePassword,
+    logout
+  }), [data, user, loading, error, toast]);
+  return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>;
 }
 
-export function useDemo() {
-  const value = useContext(DemoContext);
-  if (!value) throw new Error('useDemo must be used inside DemoProvider');
+export function usePlatform() {
+  const value = useContext(PlatformContext);
+  if (!value) throw new Error('usePlatform must be used inside PlatformProvider');
   return value;
 }

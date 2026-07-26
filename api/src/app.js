@@ -1,4 +1,5 @@
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import express from 'express';
 import helmet from 'helmet';
 import pino from 'pino';
@@ -34,6 +35,7 @@ export function createApp() {
     credentials: true
   }));
   app.use(express.json({ limit: env.JSON_BODY_LIMIT }));
+  app.use(cookieParser());
   app.use(globalRateLimit);
   app.use(env.API_PREFIX, apiRouter);
   app.use(notFound);

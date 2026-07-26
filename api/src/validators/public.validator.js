@@ -26,13 +26,3 @@ export const publicInnovationDetailSchema = z.object({
   params: z.object({ slug: z.string().trim().min(1).max(160).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/) }),
   query: emptyObject
 });
-
-export const demoActionSchema = z.object({
-  body: z.object({
-    action: z.string().trim().min(2).max(100),
-    entityId: z.string().trim().min(1).max(160),
-    note: z.string().trim().max(1000).optional()
-  }).strict(),
-  params: emptyObject,
-  query: emptyObject
-});

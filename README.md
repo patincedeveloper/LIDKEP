@@ -1,6 +1,6 @@
 # LIDKEP professional MVP
 
-LIDKEP is a responsive React/TypeScript demonstration of Rwanda's Local Innovation Discovery and Knowledge Exchange Platform.
+LIDKEP is Rwanda's Local Innovation Discovery and Knowledge Exchange Platform.
 
 ## Run
 
@@ -11,24 +11,21 @@ npm dev
 
 - Application: `http://localhost:5173`
 - API: `http://localhost:3001/api/v1`
-- Full role demo selector: `http://localhost:5173/demo`
 
-## Demo workspaces
+## Initial accounts
 
-No production credentials are stored in source. Use the demo selector to open a safe, non-persistent workspace for each authoritative role:
+The production seed creates exactly two initial accounts from environment variables:
 
-| Role | Demo identity | Start route |
-| --- | --- | --- |
-| System Administrator | Aline Uwase | `/admin/dashboard` |
-| Innovator | Keza Nyirabazungu | `/innovator/dashboard` |
-| Expert | Dr. Pascal Habimana | `/expert/dashboard` |
-| Investor / Partner | Isoko Ventures | `/partner/dashboard` |
-| Public User | Ariane Mukamana | `/discover` |
+- `INITIAL_ADMIN_EMAIL` / `INITIAL_ADMIN_PASSWORD`
+- `INITIAL_INNOVATOR_EMAIL` / `INITIAL_INNOVATOR_PASSWORD`
+
+Both initial accounts must change their password. Other users register through `/register`;
+Expert and Investor/Partner registrations await administrator approval.
 
 ## Implemented UI journeys
 
 - Public home, directory, combined filters, statistics, stable innovation detail URLs, sharing and system states.
-- Registration, sign-in, password recovery and demo account access.
+- Registration, sign-in, logout, secure sessions, account-state enforcement, and password changes.
 - Innovator dashboard, portfolio, multi-step autosave form, preview, versions, feedback, revisions, milestones, engagements, notifications and profile/team.
 - Expert dashboard, assignment queue, screening checklist, weighted scoring, criterion comments, revision items, recommendation and history.
 - Investor/Partner dashboard, discovery, saved opportunities, contact/funding/partnership forms, consent notice and engagement tracking.
@@ -51,9 +48,8 @@ npm run prisma:seed
 npm run dev
 ```
 
-`GET /api/v1/demo/bootstrap` remains a temporary frontend compatibility endpoint. It is
-available only when `ENABLE_DEMO_ROUTES=true` and should remain disabled in production.
-Identity, write workflows, and durable uploads are implemented in later phases.
+Demo identity routes and sample users have been removed. Public data and authenticated
+workspace data are read from PostgreSQL.
 
 ## Docker
 

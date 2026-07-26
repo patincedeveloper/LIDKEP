@@ -6,7 +6,6 @@ RUN npm ci
 FROM dependencies AS api
 ENV NODE_ENV=production
 COPY prisma.config.js ./
-COPY lidkep_mock_data.json ./
 COPY api ./api
 RUN npm run prisma:generate
 EXPOSE 3001

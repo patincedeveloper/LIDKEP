@@ -24,7 +24,15 @@ const envSchema = z.object({
   SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
-  ENABLE_DEMO_ROUTES: booleanFromString.default('false')
+  ENABLE_DEMO_ROUTES: booleanFromString.default('false'),
+  SESSION_COOKIE_NAME: z.string().regex(/^[a-zA-Z0-9_-]+$/).default('lidkep_session'),
+  SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(168),
+  SESSION_IDLE_HOURS: z.coerce.number().int().min(1).max(168).default(24),
+  COOKIE_SECURE: booleanFromString.default('true'),
+  INITIAL_ADMIN_EMAIL: z.string().email().optional(),
+  INITIAL_ADMIN_PASSWORD: z.string().min(12).optional(),
+  INITIAL_INNOVATOR_EMAIL: z.string().email().optional(),
+  INITIAL_INNOVATOR_PASSWORD: z.string().min(12).optional()
 });
 
 /**

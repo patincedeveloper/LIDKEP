@@ -6,8 +6,9 @@ export default defineConfig({
     include: ['api/src/tests/**/*.test.js'],
     env: {
       NODE_ENV: 'test',
-      DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/lidkep_test',
-      ENABLE_DEMO_ROUTES: 'true',
+      DATABASE_URL: 'postgresql://lidkep_app:DemoTest%40123@localhost:5434/lidkep',
+      ENABLE_DEMO_ROUTES: 'false',
+      COOKIE_SECURE: 'false',
       LOG_LEVEL: 'silent',
       RATE_LIMIT_MAX: '1000'
     }

@@ -150,6 +150,7 @@ model User {
   lockedUntil         DateTime?
   mfaEnabled          Boolean       @default(false)
   mfaSecretEncrypted  String?
+  mustChangePassword  Boolean       @default(false)
   tokenVersion        Int           @default(0)
   lastLoginAt         DateTime?
   createdAt           DateTime      @default(now())

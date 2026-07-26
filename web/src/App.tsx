@@ -1,14 +1,14 @@
 import { Route, Routes } from 'react-router-dom';
 import styled from '@emotion/styled';
 import { CheckCircle2 } from 'lucide-react';
-import { useDemo } from './api';
-import { AboutPage, AuthPage, DemoAccessPage, DirectoryPage, HomePage, InnovationDetailPage, StatisticsPage, SystemStatePage } from './pages/PublicPages';
+import { usePlatform } from './api';
+import { AboutPage, AuthPage, ChangePasswordPage, DirectoryPage, HomePage, InnovationDetailPage, StatisticsPage, SystemStatePage } from './pages/PublicPages';
 import { WorkspacePage } from './pages/WorkspacePages';
 import { ErrorScreen, LoadingScreen } from './ui';
 import { palette } from './styles';
 
 export function App() {
-  const { loading, error, toast } = useDemo();
+  const { loading, error, toast } = usePlatform();
   if (loading) return <LoadingScreen/>;
   if (error) return <ErrorScreen message={error}/>;
   return <>
@@ -21,7 +21,7 @@ export function App() {
       <Route path="/login" element={<AuthPage mode="login"/>}/>
       <Route path="/register" element={<AuthPage mode="register"/>}/>
       <Route path="/forgot-password" element={<AuthPage mode="reset"/>}/>
-      <Route path="/demo" element={<DemoAccessPage/>}/>
+      <Route path="/change-password" element={<ChangePasswordPage/>}/>
       <Route path="/forbidden" element={<SystemStatePage code="403" title="Access restricted" copy="Your current role, account state, or relationship does not permit access to this resource."/>}/>
       <Route path="/session-expired" element={<SystemStatePage code="419" title="Session expired" copy="Your secure session has ended. Sign in again to continue."/>}/>
       <Route path="/offline" element={<SystemStatePage code="OFFLINE" title="You are offline" copy="Reconnect to continue. Draft work will be retried when a connection is available."/>}/>

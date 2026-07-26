@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
-import { DemoProvider } from './api';
+import { PlatformProvider } from './api';
 import { AppTheme, GlobalStyle } from './styles';
 
 createRoot(document.getElementById('root')!).render(
@@ -10,7 +10,7 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <AppTheme>
         <GlobalStyle/>
-        <DemoProvider><App/></DemoProvider>
+        <PlatformProvider><App/></PlatformProvider>
       </AppTheme>
     </BrowserRouter>
   </StrictMode>

@@ -60,7 +60,7 @@ const Progress=styled.div`height:7px;background:#e7ece9;border-radius:999px;over
 export const ListLink = ({to,title,meta,status}:{to:string;title:string;meta:string;status?:string}) => <ListLinkWrap to={to}><div><strong>{title}</strong><span>{meta}</span></div>{status&&<StatusBadge status={status}/>}<ChevronRight size={18}/></ListLinkWrap>;
 const ListLinkWrap=styled(Link)`display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px;padding:15px 20px;border-bottom:1px solid ${palette.line};transition:.15s;&:last-of-type{border:0;}&:hover{background:#f9fcfa;}div{display:flex;flex-direction:column;}strong{font-size:14px;}span{font-size:12px;color:${palette.muted};}`;
 
-export const LoadingScreen=()=> <StateScreen><LoaderCircle className="spin" size={30}/><h2>Preparing your workspace</h2><p>Loading secure demo data...</p></StateScreen>;
+export const LoadingScreen=()=> <StateScreen><LoaderCircle className="spin" size={30}/><h2>Preparing your workspace</h2><p>Loading secure platform data...</p></StateScreen>;
 export const ErrorScreen=({message}:{message:string})=> <StateScreen><CircleAlert size={32}/><h2>We could not load LIDKEP</h2><p>{message}</p><Button onClick={()=>location.reload()}>Try again</Button></StateScreen>;
 const StateScreen=styled.main`min-height:100dvh;display:grid;place-content:center;text-align:center;padding:24px;color:${palette.muted};svg{margin:auto;color:${palette.green};}.spin{animation:spin 1s linear infinite;}h2{color:${palette.ink};margin:14px 0 4px;}p{margin:0 0 18px;}@keyframes spin{to{transform:rotate(360deg)}}`;
 

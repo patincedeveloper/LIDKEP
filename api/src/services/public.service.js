@@ -1,79 +1,129 @@
-import { readFileSync } from 'node:fs';
+import { prisma } from '../config/database.js';
 import { AppError } from '../lib/http.js';
 
-const fixturePath = new URL('../../../lidkep_mock_data.json', import.meta.url);
-const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
+const taxonomyKeys = {
+  SECTOR: 'sectors',
+  CATEGORY: 'categories',
+  DISTRICT: 'districts',
+  MATURITY_LEVEL: 'maturityLevels',
+  IMPACT_AREA: 'impactAreas'
+};
 
-function publicInnovations() {
-  return fixture.innovations.filter((innovation) => innovation.status === 'PUBLISHED');
-}
-
-function serializePublicInnovation(item) {
-  // This allowlist is intentionally explicit: private contacts, verification evidence,
-  // storage identifiers, and unpublished fields must never leak through object spreading.
+export function serializeInnovation(innovation, version = innovation.publishedVersion ?? innovation.versions?.[0]) {
+  if (!version) return null;
   return {
-    id: item.id,
-    slug: item.slug,
-    title: item.title,
-    summary: item.summary,
-    problem: item.problem,
-    solution: item.solution,
-    beneficiaries: item.beneficiaries,
-    sector: item.sector,
-    category: item.category,
-    district: item.district,
-    maturity: item.maturity,
-    status: item.status,
-    impact: item.impact,
-    supportNeeded: item.supportNeeded,
-    owner: item.owner,
-    organization: item.organization,
-    publishedAt: item.publishedAt,
-    version: item.version,
-    views: item.views,
-    saves: item.saves,
-    imageTone: item.imageTone,
-    metrics: item.metrics,
-    milestones: item.milestones
+    id: innovation.id,
+    slug: innovation.slug,
+    title: version.title,
+    summary: version.summary,
+    problem: version.problem,
+    solution: version.solution,
+    beneficiaries: version.beneficiaries,
+    sector: version.sector,
+    category: version.category,
+    district: version.district,
+    maturity: version.maturity,
+    status: innovation.status,
+    impact: version.impact,
+    supportNeeded: version.supportNeeded,
+    owner: version.ownerDisplaySnapshot ?? 'LIDKEP innovator',
+    organization: version.organizationSnapshot ?? '',
+    publishedAt: innovation.publishedAt?.toISOString() ?? '',
+    version: version.versionNumber,
+    completion: version.completionPercent,
+    views: 0,
+    saves: 0,
+    imageTone: 'mint',
+    evidence: [],
+    metrics: Array.isArray(version.metrics) ? version.metrics : [],
+    milestones: (innovation.milestones ?? []).map((item) => ({
+      title: item.title,
+      date: item.completedAt?.toISOString() ?? item.targetDate?.toISOString() ?? '',
+      status: item.status
+    }))
   };
 }
 
-export function listPublicInnovations(filters) {
-  const query = filters.q.toLowerCase();
-  const filtered = publicInnovations().filter((item) => {
-    const searchable = `${item.title} ${item.summary} ${item.problem} ${item.solution}`.toLowerCase();
-    return (!query || searchable.includes(query))
-      && (!filters.sector || item.sector === filters.sector)
-      && (!filters.district || item.district === filters.district)
-      && (!filters.maturity || item.maturity === filters.maturity);
+export async function listPublicInnovations(filters) {
+  const where = {
+    status: 'PUBLISHED',
+    publishedVersion: {
+      is: {
+        ...(filters.q ? {
+          OR: [
+            { title: { contains: filters.q, mode: 'insensitive' } },
+            { summary: { contains: filters.q, mode: 'insensitive' } },
+            { problem: { contains: filters.q, mode: 'insensitive' } },
+            { solution: { contains: filters.q, mode: 'insensitive' } }
+          ]
+        } : {}),
+        ...(filters.sector ? { sector: filters.sector } : {}),
+        ...(filters.district ? { district: filters.district } : {}),
+        ...(filters.maturity ? { maturity: filters.maturity } : {})
+      }
+    }
+  };
+  const [total, records] = await prisma.$transaction([
+    prisma.innovation.count({ where }),
+    prisma.innovation.findMany({
+      where,
+      include: { publishedVersion: true, milestones: { where: { visibility: 'PUBLIC' } } },
+      orderBy: { publishedAt: 'desc' },
+      skip: (filters.page - 1) * filters.pageSize,
+      take: filters.pageSize
+    })
+  ]);
+  return { items: records.map((item) => serializeInnovation(item)), total };
+}
+
+export async function getPublicInnovation(slug) {
+  const innovation = await prisma.innovation.findFirst({
+    where: { slug, status: 'PUBLISHED', publishedVersionId: { not: null } },
+    include: { publishedVersion: true, milestones: { where: { visibility: 'PUBLIC' } } }
   });
-  const start = (filters.page - 1) * filters.pageSize;
+  if (!innovation) throw new AppError(404, 'INNOVATION_NOT_FOUND', 'The published innovation was not found.');
+  return serializeInnovation(innovation);
+}
+
+export async function getPublicStatistics() {
+  const [publishedInnovations, districts, activeExperts, collaborationRequests] = await Promise.all([
+    prisma.innovation.count({ where: { status: 'PUBLISHED' } }),
+    prisma.innovationVersion.findMany({
+      where: { publishedFor: { isNot: null } },
+      distinct: ['district'],
+      select: { district: true }
+    }),
+    prisma.user.count({ where: { role: { code: 'EXPERT' }, status: 'ACTIVE' } }),
+    prisma.engagement.count()
+  ]);
   return {
-    items: filtered.slice(start, start + filters.pageSize).map(serializePublicInnovation),
-    total: filtered.length
+    publishedInnovations,
+    districtsReached: districts.length,
+    activeExperts,
+    collaborationRequests,
+    monthlySubmissions: [0, 0, 0, 0, 0, publishedInnovations],
+    sectorDistribution: []
   };
 }
 
-export function getPublicInnovation(slug) {
-  const innovation = publicInnovations().find((item) => item.slug === slug);
-  if (!innovation) {
-    throw new AppError(404, 'INNOVATION_NOT_FOUND', 'The published innovation was not found.');
+export async function getPublicTaxonomies() {
+  const records = await prisma.taxonomy.findMany({
+    where: { isActive: true },
+    orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }]
+  });
+  const result = { sectors: [], categories: [], districts: [], maturityLevels: [], impactAreas: [] };
+  for (const item of records) {
+    const key = taxonomyKeys[item.type];
+    if (key) result[key].push(item.label);
   }
-  return serializePublicInnovation(innovation);
+  return result;
 }
 
-export function getPublicStatistics() {
-  return fixture.statistics;
-}
-
-export function getPublicTaxonomies() {
-  return fixture.taxonomies;
-}
-
-export function getDemoBootstrap() {
-  return fixture;
-}
-
-export function recordDemoAction(input) {
-  return { ...input, status: 'RECORDED_IN_DEMO', persisted: false, occurredAt: new Date().toISOString() };
+export async function getPublicBootstrap() {
+  const [listed, statistics, taxonomies] = await Promise.all([
+    listPublicInnovations({ q: '', sector: '', district: '', maturity: '', page: 1, pageSize: 100 }),
+    getPublicStatistics(),
+    getPublicTaxonomies()
+  ]);
+  return { innovations: listed.items, statistics, taxonomies };
 }
