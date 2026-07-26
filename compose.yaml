@@ -1,0 +1,72 @@
+name: lidkep
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: lidkep
+      POSTGRES_USER: lidkep_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD before starting Compose}
+    ports:
+      - "5434:5432"
+    volumes:
+      - lidkep_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lidkep_app -d lidkep"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      target: api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3001
+      API_PREFIX: /api/v1
+      DATABASE_URL: postgresql://lidkep_app:${POSTGRES_PASSWORD}@db:5432/lidkep
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      # Nginx is the single trusted proxy hop; never use an unrestricted true value.
+      TRUST_PROXY: "1"
+      JSON_BODY_LIMIT: 1mb
+      LOG_LEVEL: info
+      SHUTDOWN_TIMEOUT_MS: 10000
+      RATE_LIMIT_WINDOW_MS: 60000
+      RATE_LIMIT_MAX: 100
+      ENABLE_DEMO_ROUTES: "true"
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/api/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  lidkep_postgres_data:

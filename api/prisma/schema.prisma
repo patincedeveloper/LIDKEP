@@ -1,0 +1,531 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum RoleCode {
+  SYSTEM_ADMINISTRATOR
+  INNOVATOR
+  EXPERT
+  INVESTOR_PARTNER
+  PUBLIC_USER
+}
+
+enum AccountStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  SUSPENDED
+  DISABLED
+  LOCKED
+}
+
+enum VerificationStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum InnovationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  REVISION_REQUIRED
+  RECOMMENDED
+  APPROVED
+  REJECTED
+  ARCHIVED
+  PUBLISHED
+}
+
+enum Visibility {
+  PUBLIC
+  AUTHENTICATED
+  REVIEW_TEAM
+  ADMIN_ONLY
+}
+
+enum FileScanStatus {
+  PENDING
+  CLEAN
+  REJECTED
+  FAILED
+}
+
+enum MilestoneStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AssignmentStatus {
+  ASSIGNED
+  ACCEPTED
+  IN_PROGRESS
+  REVISION_REQUESTED
+  COMPLETED
+  CANCELLED
+}
+
+enum ReviewStatus {
+  DRAFT
+  SUBMITTED
+  REOPENED
+}
+
+enum Recommendation {
+  APPROVE
+  REVISION_REQUIRED
+  REJECT
+}
+
+enum RevisionStatus {
+  OPEN
+  RESPONDED
+  RESOLVED
+  CANCELLED
+}
+
+enum EngagementType {
+  CONTACT
+  FUNDING_OFFER
+  PARTNERSHIP_REQUEST
+}
+
+enum EngagementStatus {
+  DRAFT
+  PENDING
+  ACCEPTED
+  DECLINED
+  CLARIFICATION_REQUESTED
+  WITHDRAWN
+  CLOSED
+}
+
+enum ConsentScope {
+  SHARE_EMAIL
+  SHARE_PHONE
+  SHARE_ORGANIZATION_CONTACT
+}
+
+enum TaxonomyType {
+  SECTOR
+  CATEGORY
+  DISTRICT
+  MATURITY_LEVEL
+  IMPACT_AREA
+  INNOVATION_TYPE
+}
+
+enum CriteriaStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        RoleCode @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       User[]
+}
+
+model User {
+  id                  String        @id @default(uuid()) @db.Uuid
+  email               String        @unique
+  passwordHash        String?
+  roleId              String        @db.Uuid
+  status              AccountStatus @default(PENDING_APPROVAL)
+  emailVerifiedAt     DateTime?
+  failedLoginAttempts Int           @default(0)
+  lockedUntil         DateTime?
+  mfaEnabled          Boolean       @default(false)
+  mfaSecretEncrypted  String?
+  tokenVersion        Int           @default(0)
+  lastLoginAt         DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  deletedAt           DateTime?
+  role                Role          @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  profile             UserProfile?
+  verificationRequests VerificationRequest[] @relation("VerificationApplicant")
+  verificationDecisions VerificationRequest[] @relation("VerificationDecider")
+  innovations         Innovation[]
+  uploads             EvidenceFile[]
+  expertAssignments   ExpertAssignment[] @relation("AssignedExpert")
+  assignmentsMade     ExpertAssignment[] @relation("AssignmentAdministrator")
+  reviews             Review[] @relation("ReviewReviewer")
+  engagements         Engagement[] @relation("EngagementPartner")
+  engagementConsents  EngagementConsent[]
+  notifications       Notification[]
+  auditLogs            AuditLog[] @relation("AuditActor")
+  criteriaVersions    EvaluationCriteriaVersion[] @relation("CriteriaCreator")
+  sessions             Session[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@index([roleId, status])
+}
+
+model UserProfile {
+  id                  String     @id @default(uuid()) @db.Uuid
+  userId              String     @unique @db.Uuid
+  displayName         String
+  organization        String?
+  biography           String?
+  district            String?
+  preferredLanguage   String     @default("en")
+  publicProfile       Boolean    @default(false)
+  privateContactEmail String?
+  privatePhone        String?
+  contactPreference   String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  user                User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationRequest {
+  id              String             @id @default(uuid()) @db.Uuid
+  userId          String             @db.Uuid
+  requestedRole   RoleCode
+  status          VerificationStatus @default(DRAFT)
+  submittedAt     DateTime?
+  decidedAt       DateTime?
+  decidedById     String?            @db.Uuid
+  decisionReason  String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  user            User               @relation("VerificationApplicant", fields: [userId], references: [id], onDelete: Cascade)
+  decidedBy       User?              @relation("VerificationDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  evidenceFiles   EvidenceFile[]
+
+  @@index([status, submittedAt])
+}
+
+model Innovation {
+  id                 String           @id @default(uuid()) @db.Uuid
+  ownerId            String           @db.Uuid
+  slug               String           @unique
+  status             InnovationStatus @default(DRAFT)
+  publishedVersionId String?          @unique @db.Uuid
+  publishedAt        DateTime?
+  archivedAt         DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  owner              User             @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  versions           InnovationVersion[] @relation("InnovationVersions")
+  publishedVersion   InnovationVersion? @relation("PublishedInnovationVersion", fields: [publishedVersionId], references: [id], onDelete: Restrict)
+  milestones         Milestone[]
+  engagements        Engagement[]
+
+  @@index([ownerId, status])
+  @@index([status, publishedAt])
+}
+
+model InnovationVersion {
+  id                   String     @id @default(uuid()) @db.Uuid
+  innovationId         String     @db.Uuid
+  versionNumber        Int
+  title                String
+  summary              String
+  problem              String
+  solution             String
+  beneficiaries        String
+  sector               String
+  category             String
+  district             String
+  maturity             String
+  impact               String
+  supportNeeded        String
+  organizationSnapshot String?
+  ownerDisplaySnapshot String?
+  metrics              Json       @default("[]")
+  completionPercent    Int        @default(0)
+  ownershipDeclaredAt  DateTime?
+  accuracyDeclaredAt   DateTime?
+  submittedAt          DateTime?
+  immutableAt          DateTime?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  innovation           Innovation @relation("InnovationVersions", fields: [innovationId], references: [id], onDelete: Cascade)
+  publishedFor         Innovation? @relation("PublishedInnovationVersion")
+  evidenceFiles        EvidenceFile[]
+  assignments          ExpertAssignment[]
+  reviews              Review[]
+  revisionRequests     RevisionRequest[]
+  engagements          Engagement[]
+
+  @@unique([innovationId, versionNumber])
+  @@index([innovationId, submittedAt])
+}
+
+model EvidenceFile {
+  id                    String         @id @default(uuid()) @db.Uuid
+  uploadedById          String         @db.Uuid
+  innovationVersionId   String?        @db.Uuid
+  milestoneId           String?        @db.Uuid
+  verificationRequestId String?        @db.Uuid
+  originalName          String
+  storageKey            String         @unique
+  mimeType              String
+  sizeBytes             BigInt
+  checksumSha256        String
+  visibility            Visibility     @default(REVIEW_TEAM)
+  scanStatus            FileScanStatus @default(PENDING)
+  publicApprovedAt      DateTime?
+  createdAt             DateTime       @default(now())
+  uploadedBy            User           @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  innovationVersion     InnovationVersion? @relation(fields: [innovationVersionId], references: [id], onDelete: Cascade)
+  milestone             Milestone?     @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  verificationRequest   VerificationRequest? @relation(fields: [verificationRequestId], references: [id], onDelete: Cascade)
+
+  @@index([innovationVersionId, visibility])
+  @@index([verificationRequestId])
+}
+
+model Milestone {
+  id          String          @id @default(uuid()) @db.Uuid
+  innovationId String         @db.Uuid
+  title       String
+  description String?
+  targetDate  DateTime?
+  completedAt DateTime?
+  status      MilestoneStatus @default(PLANNED)
+  visibility  Visibility      @default(REVIEW_TEAM)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  innovation  Innovation      @relation(fields: [innovationId], references: [id], onDelete: Cascade)
+  evidenceFiles EvidenceFile[]
+
+  @@index([innovationId, status])
+}
+
+model ExpertAssignment {
+  id            String           @id @default(uuid()) @db.Uuid
+  versionId     String           @db.Uuid
+  expertId      String           @db.Uuid
+  assignedById  String           @db.Uuid
+  status        AssignmentStatus @default(ASSIGNED)
+  dueAt         DateTime?
+  acceptedAt    DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  version       InnovationVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  expert        User             @relation("AssignedExpert", fields: [expertId], references: [id], onDelete: Restrict)
+  assignedBy    User             @relation("AssignmentAdministrator", fields: [assignedById], references: [id], onDelete: Restrict)
+  review        Review?
+
+  @@unique([versionId, expertId])
+  @@index([expertId, status, dueAt])
+}
+
+model Review {
+  id                String         @id @default(uuid()) @db.Uuid
+  assignmentId      String         @unique @db.Uuid
+  versionId         String         @db.Uuid
+  reviewerId        String         @db.Uuid
+  criteriaVersionId String         @db.Uuid
+  status            ReviewStatus   @default(DRAFT)
+  recommendation    Recommendation?
+  totalScore        Decimal?       @db.Decimal(5, 2)
+  rationale         String?
+  submittedAt       DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  assignment        ExpertAssignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  version           InnovationVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  reviewer          User           @relation("ReviewReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+  criteriaVersion   EvaluationCriteriaVersion @relation(fields: [criteriaVersionId], references: [id], onDelete: Restrict)
+  scores            ReviewCriterionScore[]
+  revisionRequests  RevisionRequest[]
+
+  @@index([versionId, status])
+}
+
+model ReviewCriterionScore {
+  id                String   @id @default(uuid()) @db.Uuid
+  reviewId          String   @db.Uuid
+  criterionKey      String
+  criterionName     String
+  weight            Decimal  @db.Decimal(5, 2)
+  score             Decimal  @db.Decimal(5, 2)
+  comment           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  review            Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, criterionKey])
+}
+
+model RevisionRequest {
+  id          String         @id @default(uuid()) @db.Uuid
+  reviewId    String         @db.Uuid
+  versionId   String         @db.Uuid
+  fieldKey    String
+  instruction String
+  response    String?
+  dueAt       DateTime?
+  respondedAt DateTime?
+  resolvedAt  DateTime?
+  status      RevisionStatus @default(OPEN)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  review      Review         @relation(fields: [reviewId], references: [id], onDelete: Restrict)
+  version     InnovationVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+
+  @@index([versionId, status])
+}
+
+model Engagement {
+  id                     String           @id @default(uuid()) @db.Uuid
+  innovationId           String           @db.Uuid
+  innovationVersionId    String           @db.Uuid
+  partnerId              String           @db.Uuid
+  type                    EngagementType
+  status                  EngagementStatus @default(DRAFT)
+  summary                 String
+  termsSummary            String?
+  nonBindingAcceptedAt    DateTime?
+  contactSharedAt         DateTime?
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+  innovation              Innovation       @relation(fields: [innovationId], references: [id], onDelete: Restrict)
+  innovationVersion       InnovationVersion @relation(fields: [innovationVersionId], references: [id], onDelete: Restrict)
+  partner                 User             @relation("EngagementPartner", fields: [partnerId], references: [id], onDelete: Restrict)
+  consents                EngagementConsent[]
+
+  @@index([partnerId, status])
+  @@index([innovationId, status])
+}
+
+model EngagementConsent {
+  id           String       @id @default(uuid()) @db.Uuid
+  engagementId String       @db.Uuid
+  userId       String       @db.Uuid
+  scope        ConsentScope
+  grantedAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime     @default(now())
+  engagement   Engagement   @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([engagementId, userId, scope])
+}
+
+model Notification {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  type       String
+  title      String
+  message    String
+  entityType String?
+  entityId   String?
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @db.Uuid
+  action     String
+  entityType String
+  entityId   String?
+  requestId  String   @db.Uuid
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model Taxonomy {
+  id        String       @id @default(uuid()) @db.Uuid
+  type      TaxonomyType
+  code      String
+  label     String
+  parentId  String?      @db.Uuid
+  sortOrder Int          @default(0)
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  parent    Taxonomy?    @relation("TaxonomyTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children  Taxonomy[]   @relation("TaxonomyTree")
+
+  @@unique([type, code])
+  @@index([type, isActive, sortOrder])
+}
+
+model EvaluationCriteriaVersion {
+  id          String         @id @default(uuid()) @db.Uuid
+  version     String         @unique
+  name        String
+  status      CriteriaStatus @default(DRAFT)
+  createdById String         @db.Uuid
+  activatedAt DateTime?
+  retiredAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  createdBy   User           @relation("CriteriaCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  criteria    EvaluationCriterion[]
+  reviews     Review[]
+}
+
+model EvaluationCriterion {
+  id                String   @id @default(uuid()) @db.Uuid
+  criteriaVersionId String   @db.Uuid
+  key               String
+  name              String
+  guidance          String?
+  weight            Decimal  @db.Decimal(5, 2)
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now())
+  criteriaVersion   EvaluationCriteriaVersion @relation(fields: [criteriaVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([criteriaVersionId, key])
+}
+
+model Session {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @db.Uuid
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  idleExpiresAt  DateTime
+  lastSeenAt     DateTime  @default(now())
+  revokedAt      DateTime?
+  revokeReason   String?
+  ipHash         String?
+  userAgent      String?
+  rotatedFromId  String?   @unique @db.Uuid
+  createdAt      DateTime  @default(now())
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rotatedFrom    Session?  @relation("SessionRotation", fields: [rotatedFromId], references: [id], onDelete: SetNull)
+  rotatedTo      Session?  @relation("SessionRotation")
+
+  @@index([userId, revokedAt, expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
