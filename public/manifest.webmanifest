@@ -1,0 +1,13 @@
+{
+  "name": "Local Innovation Discovery and Knowledge Exchange Platform",
+  "short_name": "LIDKEP",
+  "description": "Rwanda's trusted platform for documenting, evaluating, discovering and supporting local innovation.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f8f5",
+  "theme_color": "#0b6255",
+  "lang": "en",
+  "icons": [
+    {"src":"/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}

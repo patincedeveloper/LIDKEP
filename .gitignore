@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.vite/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test output
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# Local databases and generated storage
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+uploads/
+storage/
+tmp/
+
+# Generated Prisma client and migration shadow files
+api/prisma/.shadow/
+
+# TypeScript caches
+*.tsbuildinfo
+
+# Editor and operating-system metadata
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local runtime state
+.cache/
+.eslintcache
+
+# Local Codex configuration
+.codex/
