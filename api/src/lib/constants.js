@@ -1,0 +1,19 @@
+export const ROLE_CODES = Object.freeze([
+  'SYSTEM_ADMINISTRATOR',
+  'INNOVATOR',
+  'EXPERT',
+  'INVESTOR_PARTNER',
+  'PUBLIC_USER'
+]);
+
+export const INNOVATION_STATUSES = Object.freeze([
+  'DRAFT',
+  'SUBMITTED',
+  'UNDER_REVIEW',
+  'REVISION_REQUIRED',
+  'RECOMMENDED',
+  'APPROVED',
+  'REJECTED',
+  'ARCHIVED',
+  'PUBLISHED'
+]);
