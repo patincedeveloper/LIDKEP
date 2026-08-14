@@ -168,10 +168,10 @@ model User {
   engagements         Engagement[] @relation("EngagementPartner")
   engagementConsents  EngagementConsent[]
   notifications       Notification[]
-  auditLogs            AuditLog[] @relation("AuditActor")
   criteriaVersions    EvaluationCriteriaVersion[] @relation("CriteriaCreator")
   sessions             Session[]
   passwordResetTokens PasswordResetToken[]
+  settingsUpdated     PlatformSetting[] @relation("SettingUpdater")
 
   @@index([roleId, status])
 }
@@ -181,8 +181,14 @@ model UserProfile {
   userId              String     @unique @db.Uuid
   displayName         String
   organization        String?
-  biography           String?
+  identificationType  String?
+  identificationNumber String?
+  educationLevel      String?
+  province            String?
   district            String?
+  administrativeSector String?
+  occupation          String?
+  yearsOfExperience   Int?
   preferredLanguage   String     @default("en")
   publicProfile       Boolean    @default(false)
   privateContactEmail String?
@@ -199,6 +205,8 @@ model VerificationRequest {
   requestedRole   RoleCode
   status          VerificationStatus @default(DRAFT)
   submittedAt     DateTime?
+  reviewedAt      DateTime?
+  reviewedById    String?            @db.Uuid
   decidedAt       DateTime?
   decidedById     String?            @db.Uuid
   decisionReason  String?
@@ -226,6 +234,7 @@ model Innovation {
   publishedVersion   InnovationVersion? @relation("PublishedInnovationVersion", fields: [publishedVersionId], references: [id], onDelete: Restrict)
   milestones         Milestone[]
   engagements        Engagement[]
+  expertAssignment   ExpertAssignment?
 
   @@index([ownerId, status])
   @@index([status, publishedAt])
@@ -244,8 +253,15 @@ model InnovationVersion {
   category             String
   district             String
   maturity             String
+  impactArea           String     @default("")
   impact               String
+  novelty              String     @default("")
+  currentEvidence      String     @default("")
+  implementationPlan   String     @default("")
+  scalability          String     @default("")
+  sustainability       String     @default("")
   supportNeeded        String
+  supportingLinks      Json       @default("[]")
   organizationSnapshot String?
   ownerDisplaySnapshot String?
   metrics              Json       @default("[]")
@@ -311,6 +327,7 @@ model Milestone {
 
 model ExpertAssignment {
   id            String           @id @default(uuid()) @db.Uuid
+  innovationId  String           @unique @db.Uuid
   versionId     String           @db.Uuid
   expertId      String           @db.Uuid
   assignedById  String           @db.Uuid
@@ -320,6 +337,7 @@ model ExpertAssignment {
   completedAt   DateTime?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
+  innovation    Innovation       @relation(fields: [innovationId], references: [id], onDelete: Restrict)
   version       InnovationVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
   expert        User             @relation("AssignedExpert", fields: [expertId], references: [id], onDelete: Restrict)
   assignedBy    User             @relation("AssignmentAdministrator", fields: [assignedById], references: [id], onDelete: Restrict)
@@ -437,22 +455,6 @@ model Notification {
   @@index([userId, readAt, createdAt])
 }
 
-model AuditLog {
-  id         String   @id @default(uuid()) @db.Uuid
-  actorId    String?  @db.Uuid
-  action     String
-  entityType String
-  entityId   String?
-  requestId  String   @db.Uuid
-  metadata   Json?
-  createdAt  DateTime @default(now())
-  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
-
-  @@index([createdAt])
-  @@index([actorId, createdAt])
-  @@index([entityType, entityId])
-}
-
 model Taxonomy {
   id        String       @id @default(uuid()) @db.Uuid
   type      TaxonomyType
@@ -529,4 +531,12 @@ model PasswordResetToken {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
+}
+
+model PlatformSetting {
+  key         String   @id
+  value       Json
+  updatedById String?  @db.Uuid
+  updatedAt   DateTime @updatedAt
+  updatedBy   User?    @relation("SettingUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
 }

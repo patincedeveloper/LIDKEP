@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import app from '../../app.js';
+import { prisma } from '../../config/database.js';
+
+const createdEmails = [];
 
 describe('real platform identity and public API', () => {
   it('returns database-backed public bootstrap data', async () => {
@@ -18,26 +21,27 @@ describe('real platform identity and public API', () => {
     expect(response.body.error.code).toBe('ROUTE_NOT_FOUND');
   });
 
-  it('registers, authenticates, and logs out a real public user', async () => {
+  it('registers a real Innovator with a restricted profile-completion session', async () => {
     const agent = request.agent(app);
     const email = `test-${randomUUID()}@example.rw`;
     const registered = await agent.post('/api/v1/auth/register').send({
       email,
       password: 'ValidPassword@123',
       displayName: 'Integration User',
-      role: 'PUBLIC_USER'
+      role: 'INNOVATOR'
     });
     expect(registered.status).toBe(201);
+    createdEmails.push(email);
     expect(registered.body.data.user.email).toBe(email);
-    expect(registered.body.data.requiresApproval).toBe(false);
+    expect(registered.body.data.requiresApproval).toBe(true);
 
     const me = await agent.get('/api/v1/auth/me');
     expect(me.status).toBe(200);
-    expect(me.body.data.user.role).toBe('PUBLIC_USER');
-
-    const logout = await agent.post('/api/v1/auth/logout').send({});
-    expect(logout.status).toBe(200);
-    expect((await agent.get('/api/v1/auth/me')).status).toBe(401);
+    expect(me.body.data.user.approvalStatus).toBe('DRAFT');
+    expect(me.body.data.user.profileComplete).toBe(false);
+    const protectedAction = await agent.get('/api/v1/innovations');
+    expect(protectedAction.status).toBe(403);
+    expect(protectedAction.body.error.code).toBe('ACCOUNT_APPROVAL_REQUIRED');
   });
 
   it('rejects weak registration passwords', async () => {
@@ -58,5 +62,17 @@ describe('real platform identity and public API', () => {
     });
     expect(response.status).toBe(401);
     expect(response.body.error.code).toBe('INVALID_CREDENTIALS');
+  });
+});
+
+afterAll(async () => {
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe("SET LOCAL session_replication_role = 'replica'");
+    const users = await tx.user.findMany({ where: { email: { in: createdEmails } }, select: { id: true } });
+    const ids = users.map((user) => user.id);
+    await tx.verificationRequest.deleteMany({ where: { userId: { in: ids } } });
+    await tx.notification.deleteMany({ where: { OR: [{ userId: { in: ids } }, { entityId: { in: ids } }] } });
+    await tx.session.deleteMany({ where: { userId: { in: ids } } });
+    await tx.user.deleteMany({ where: { email: { in: createdEmails } } });
   });
 });

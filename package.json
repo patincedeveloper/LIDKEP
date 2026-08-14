@@ -15,10 +15,7 @@
     "prisma:validate": "prisma validate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
-    "prisma:seed": "prisma db seed",
-    "docker:up": "docker compose --env-file .env.docker up --build -d",
-    "docker:down": "docker compose --env-file .env.docker down",
-    "docker:logs": "docker compose --env-file .env.docker logs -f"
+    "prisma:seed": "prisma db seed"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -33,6 +30,7 @@
     "express-rate-limit": "^8.6.0",
     "helmet": "^8.3.0",
     "lucide-react": "^0.468.0",
+    "multer": "^2.2.0",
     "pg": "^8.22.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",

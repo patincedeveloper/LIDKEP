@@ -1,5 +1,6 @@
 import { prisma } from '../config/database.js';
 import { AppError } from '../lib/http.js';
+import { educationLevels, rwandaLocations } from '../data/rwanda-locations.js';
 
 const taxonomyKeys = {
   SECTOR: 'sectors',
@@ -23,8 +24,13 @@ export function serializeInnovation(innovation, version = innovation.publishedVe
     category: version.category,
     district: version.district,
     maturity: version.maturity,
+    impactArea: version.impactArea,
     status: innovation.status,
     impact: version.impact,
+    novelty: version.novelty,
+    implementationPlan: version.implementationPlan,
+    scalability: version.scalability,
+    sustainability: version.sustainability,
     supportNeeded: version.supportNeeded,
     owner: version.ownerDisplaySnapshot ?? 'LIDKEP innovator',
     organization: version.organizationSnapshot ?? '',
@@ -111,7 +117,10 @@ export async function getPublicTaxonomies() {
     where: { isActive: true },
     orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }]
   });
-  const result = { sectors: [], categories: [], districts: [], maturityLevels: [], impactAreas: [] };
+  const result = {
+    sectors: [], categories: [], districts: [], maturityLevels: [], impactAreas: [],
+    educationLevels, locations: rwandaLocations
+  };
   for (const item of records) {
     const key = taxonomyKeys[item.type];
     if (key) result[key].push(item.label);

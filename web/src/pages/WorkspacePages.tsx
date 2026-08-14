@@ -1,206 +1,6330 @@
-import { useEffect, useMemo, useState } from 'react';
-import styled from '@emotion/styled';
-import { Activity, Archive, ArrowRight, BarChart3, Bell, BookOpenCheck, BriefcaseBusiness, Building2, Check, CheckCircle2, ChevronDown, CircleUserRound, ClipboardCheck, Compass, FileCheck2, FileClock, FilePlus2, FileText, FolderKanban, Gauge, HandCoins, HeartHandshake, HelpCircle, History, Inbox, Layers3, Leaf, ListChecks, Menu, MessageSquareWarning, Milestone, PanelLeftClose, Plus, Save, Search, Settings, ShieldCheck, SlidersHorizontal, Tags, UploadCloud, UserCheck, Users, X } from 'lucide-react';
-import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { usePlatform } from '../api';
-import { palette } from '../styles';
-import type { Innovation, Role } from '../types';
-import { Brand, Button, ButtonLink, EmptyState, Eyebrow, Field, FormGrid, Input, ListLink, PageHeader, Panel, PanelBody, PanelHeader, ProgressBar, QuickLink, Select, StatCard, StatGrid, StatusBadge, Table, TableWrap, Textarea } from '../ui';
+import { useEffect, useMemo, useState } from "react";
+import styled from "@emotion/styled";
+import {
+  Activity,
+  ArrowLeft,
+  BarChart3,
+  Bell,
+  BriefcaseBusiness,
+  CheckCircle2,
+  ChevronRight,
+  CircleAlert,
+  CircleUserRound,
+  ClipboardCheck,
+  Download,
+  Eye,
+  FileText,
+  FolderKanban,
+  Gauge,
+  Handshake,
+  Layers3,
+  Leaf,
+  Link2,
+  LockKeyhole,
+  LogOut,
+  Menu,
+  Plus,
+  Pencil,
+  Search,
+  Send,
+  Save,
+  Settings,
+  ShieldCheck,
+  Tags,
+  Trash2,
+  UploadCloud,
+  UserCheck,
+  Users,
+  X,
+} from "lucide-react";
+import {
+  Link,
+  Navigate,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
+import { ApiRequestError, usePlatform } from "../api";
+import { palette } from "../styles";
+import type {
+  Account,
+  Assignment,
+  Engagement,
+  Innovation,
+  Role,
+} from "../types";
+import {
+  Brand,
+  Button,
+  ButtonLink,
+  EmptyState,
+  Eyebrow,
+  Field,
+  FormGrid,
+  Input,
+  PageHeader,
+  Panel,
+  PanelBody,
+  PanelHeader,
+  Select,
+  StatCard,
+  StatGrid,
+  StatusBadge,
+  Table,
+  TableWrap,
+  Textarea,
+} from "../ui";
 
-const workspaceRole: Record<string,Role>={admin:'SYSTEM_ADMINISTRATOR',innovator:'INNOVATOR',expert:'EXPERT',partner:'INVESTOR_PARTNER'};
-const roleWorkspace: Record<Role,string>={SYSTEM_ADMINISTRATOR:'admin',INNOVATOR:'innovator',EXPERT:'expert',INVESTOR_PARTNER:'partner',PUBLIC_USER:'public'};
-const navByRole:Record<Role,Array<{label:string;to:string;icon:React.ReactNode;badge?:number}>>={
-  INNOVATOR:[
-    {label:'Overview',to:'dashboard',icon:<Gauge/>},{label:'My innovations',to:'innovations',icon:<FolderKanban/>},{label:'Revisions',to:'revisions',icon:<FileClock/>,badge:2},{label:'Reviews',to:'reviews',icon:<BookOpenCheck/>},{label:'Engagements',to:'engagements',icon:<HeartHandshake/>,badge:1},{label:'Milestones',to:'milestones',icon:<Milestone/>},{label:'Notifications',to:'notifications',icon:<Bell/>,badge:2},{label:'Profile & team',to:'profile',icon:<CircleUserRound/>}
+type NavigationItem = { label: string; section: string; icon: React.ReactNode };
+type AdminDashboard = {
+  counts: {
+    users: number;
+    pendingVerifications: number;
+    innovations: number;
+    submitted: number;
+    published: number;
+  };
+};
+type Verification = {
+  id: string;
+  name: string;
+  email?: string;
+  organization: string;
+  role: Role;
+  status: string;
+  evidence: number;
+  submittedAt?: string;
+  decisionReason?: string;
+  decidedAt?: string;
+  identificationType?: string;
+  identificationNumber?: string;
+  phoneNumber?: string;
+  educationLevel?: string;
+  province?: string;
+  district?: string;
+  administrativeSector?: string;
+  occupation?: string;
+  yearsOfExperience?: number;
+  preferredLanguage?: string;
+  publicProfile?: boolean;
+  evidenceFiles?: Array<{
+    id: string;
+    name: string;
+    mimeType: string;
+    sizeBytes: string;
+  }>;
+};
+type Taxonomy = { id: string; type: string; label: string; isActive: boolean };
+type CriteriaVersion = {
+  id: string;
+  version: string;
+  name: string;
+  status: string;
+  criteria: Array<{ name: string; guidance: string; weight: number }>;
+};
+type SettingsData = {
+  publicStatistics: boolean;
+  allowComments: boolean;
+  maintenanceMode: boolean;
+  maxFileSizeMb: number;
+};
+type FieldErrors = Record<string, string>;
+
+const roleWorkspace: Record<Role, string> = {
+  SYSTEM_ADMINISTRATOR: "admin",
+  INNOVATOR: "innovator",
+  EXPERT: "expert",
+  INVESTOR_PARTNER: "partner",
+  PUBLIC_USER: "public",
+};
+const workspaceRole: Record<string, Role> = {
+  admin: "SYSTEM_ADMINISTRATOR",
+  innovator: "INNOVATOR",
+  expert: "EXPERT",
+  partner: "INVESTOR_PARTNER",
+};
+const navigation: Record<
+  "admin" | "innovator" | "expert" | "partner",
+  NavigationItem[]
+> = {
+  innovator: [
+    { label: "Overview", section: "dashboard", icon: <Gauge /> },
+    { label: "My innovations", section: "innovations", icon: <FolderKanban /> },
+    { label: "Project progress", section: "progress", icon: <Layers3 /> },
+    {
+      label: "Expert feedback",
+      section: "revisions",
+      icon: <ClipboardCheck />,
+    },
+    {
+      label: "Collaboration requests",
+      section: "collaborations",
+      icon: <Handshake />,
+    },
+    { label: "Notifications", section: "notifications", icon: <Bell /> },
+    { label: "My profile", section: "profile", icon: <CircleUserRound /> },
   ],
-  EXPERT:[
-    {label:'Overview',to:'dashboard',icon:<Gauge/>},{label:'Assignments',to:'assignments',icon:<ClipboardCheck/>,badge:2},{label:'Review workspace',to:'reviews',icon:<ListChecks/>},{label:'Revision items',to:'revisions',icon:<FileClock/>},{label:'Review history',to:'history',icon:<History/>},{label:'Notifications',to:'notifications',icon:<Bell/>,badge:2},{label:'Expert profile',to:'profile',icon:<CircleUserRound/>}
+  admin: [
+    { label: "Overview", section: "dashboard", icon: <Gauge /> },
+    { label: "Users", section: "users", icon: <Users /> },
+    {
+      label: "Account approvals",
+      section: "verifications",
+      icon: <UserCheck />,
+    },
+    { label: "Innovations", section: "innovations", icon: <FolderKanban /> },
+    { label: "Sectors & categories", section: "taxonomies", icon: <Tags /> },
+    {
+      label: "Evaluation criteria",
+      section: "criteria",
+      icon: <ClipboardCheck />,
+    },
+    { label: "Reports", section: "reports", icon: <BarChart3 /> },
+    { label: "Settings", section: "settings", icon: <Settings /> },
+    { label: "Notifications", section: "notifications", icon: <Bell /> },
   ],
-  INVESTOR_PARTNER:[
-    {label:'Overview',to:'dashboard',icon:<Gauge/>},{label:'Discover',to:'discover',icon:<Compass/>},{label:'Saved opportunities',to:'opportunities',icon:<Archive/>,badge:3},{label:'Engagements',to:'engagements',icon:<HeartHandshake/>,badge:2},{label:'Notifications',to:'notifications',icon:<Bell/>,badge:2},{label:'Partner profile',to:'profile',icon:<Building2/>}
+  expert: [
+    { label: "Overview", section: "dashboard", icon: <Gauge /> },
+    {
+      label: "Assigned reviews",
+      section: "assignments",
+      icon: <ClipboardCheck />,
+    },
+    { label: "Review history", section: "history", icon: <FileText /> },
+    { label: "Notifications", section: "notifications", icon: <Bell /> },
+    { label: "My profile", section: "profile", icon: <CircleUserRound /> },
   ],
-  SYSTEM_ADMINISTRATOR:[
-    {label:'Overview',to:'dashboard',icon:<Gauge/>},{label:'Users',to:'users',icon:<Users/>},{label:'Verifications',to:'verifications',icon:<UserCheck/>,badge:3},{label:'Assignments',to:'assignments',icon:<ClipboardCheck/>},{label:'Decisions',to:'decisions',icon:<FileCheck2/>,badge:2},{label:'Publication',to:'publication',icon:<UploadCloud/>},{label:'Moderation',to:'moderation',icon:<MessageSquareWarning/>,badge:2},{label:'Taxonomies',to:'taxonomies',icon:<Tags/>},{label:'Criteria versions',to:'criteria',icon:<SlidersHorizontal/>},{label:'Reports & exports',to:'reports',icon:<BarChart3/>},{label:'Audit logs',to:'audit',icon:<Activity/>},{label:'Settings',to:'settings',icon:<Settings/>}
+  partner: [
+    { label: "Overview", section: "dashboard", icon: <Gauge /> },
+    { label: "Discover innovations", section: "discover", icon: <Search /> },
+    {
+      label: "Opportunities",
+      section: "opportunities",
+      icon: <BriefcaseBusiness />,
+    },
+    { label: "Notifications", section: "notifications", icon: <Bell /> },
+    { label: "My profile", section: "profile", icon: <CircleUserRound /> },
   ],
-  PUBLIC_USER:[]
 };
 
-export function WorkspacePage(){
-  const {workspace='innovator',section='dashboard',id}=useParams(); const location=useLocation(); const {role,user,data,logout}=usePlatform(); const navigate=useNavigate(); const [open,setOpen]=useState(false);
-  const expectedRole=workspaceRole[workspace];
-  if(!user)return <Navigate to="/login" replace/>;
-  if(user.mustChangePassword)return <Navigate to="/change-password" replace/>;
-  if(!expectedRole||role!==expectedRole){const ownWorkspace=roleWorkspace[role];return <Navigate to={role==='PUBLIC_USER'?'/discover':`/${ownWorkspace}/dashboard`} replace/>}
-  const account=user; const nav=navByRole[expectedRole];
-  const signOut=async()=>{await logout();navigate('/login')};
-  return <Shell><SkipLink href="#workspace-main">Skip to main content</SkipLink><Sidebar $open={open}><SidebarTop><Brand/><button aria-label="Close navigation" onClick={()=>setOpen(false)}><PanelLeftClose/></button></SidebarTop><RoleChip><span>{account.name.split(' ').map(v=>v[0]).join('').slice(0,2)}</span><div><b>{account.name}</b><small>{friendlyRole(expectedRole)}</small></div><StatusDot title="Active account"/></RoleChip><SidebarNav>{nav.map(item=><Link key={item.to} to={`/${workspace}/${item.to}`} className={location.pathname.includes(`/${workspace}/${item.to}`)?'active':''} onClick={()=>setOpen(false)}>{item.icon}<span>{item.label}</span>{item.badge&&<b>{item.badge}</b>}</Link>)}</SidebarNav><SidebarBottom><button onClick={signOut}><HelpCircle/>Sign out</button><Link to="/"><Compass/>Public website</Link></SidebarBottom></Sidebar><Workspace><Topbar><button aria-label="Open navigation" onClick={()=>setOpen(true)}><Menu/></button><SearchMini><Search size={17}/><input aria-label="Search workspace" placeholder="Search this workspace"/></SearchMini><TopActions><span>{friendlyRole(role)}</span><Link to={`/${workspace}/notifications`} aria-label="Notifications"><Bell/><i/></Link><Avatar>{account.name.split(' ').map(v=>v[0]).join('').slice(0,2)}</Avatar></TopActions></Topbar><Content id="workspace-main">{section==='dashboard'?<Dashboard role={expectedRole} workspace={workspace}/>:<SectionRouter role={expectedRole} workspace={workspace} section={section} id={id}/>}</Content></Workspace><Scrim $open={open} onClick={()=>setOpen(false)}/></Shell>;
+export function WorkspacePage() {
+  const { workspace = "innovator", section = "dashboard", id } = useParams();
+  const { user, role, logout } = usePlatform();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  if (!user) return <Navigate to="/login" replace />;
+  const expectedRole = workspaceRole[workspace];
+  if (!expectedRole || expectedRole !== role)
+    return (
+      <Navigate
+        to={
+          role === "PUBLIC_USER"
+            ? "/discover"
+            : `/${roleWorkspace[role]}/dashboard`
+        }
+        replace
+      />
+    );
+  if (
+    user.accountStatus !== "ACTIVE" &&
+    !["profile", "notifications"].includes(section)
+  )
+    return <Navigate to={`/${workspace}/profile`} replace />;
+  const allItems =
+    navigation[workspace as "admin" | "innovator" | "expert" | "partner"];
+  const items =
+    user.accountStatus === "ACTIVE"
+      ? allItems
+      : allItems.filter((item) =>
+          ["profile", "notifications"].includes(item.section),
+        );
+  return (
+    <Shell>
+      <SkipLink href="#workspace-content">Skip to main content</SkipLink>
+      <Sidebar $open={open}>
+        <SidebarHead>
+          <Brand />
+          <button aria-label="Close navigation" onClick={() => setOpen(false)}>
+            <X />
+          </button>
+        </SidebarHead>
+        <Identity>
+          <Avatar>{initials(user.name)}</Avatar>
+          <span>
+            <strong>{user.name}</strong>
+            <small>{friendlyRole(role)}</small>
+            <small>{user.email}</small>
+          </span>
+        </Identity>
+        <Nav>
+          {items.map((item) => (
+            <Link
+              key={item.section}
+              to={`/${workspace}/${item.section}`}
+              className={
+                location.pathname.includes(`/${workspace}/${item.section}`)
+                  ? "active"
+                  : ""
+              }
+              onClick={() => setOpen(false)}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+              <ChevronRight />
+            </Link>
+          ))}
+        </Nav>
+        <SidebarFoot>
+          <button
+            onClick={async () => {
+              await logout();
+              navigate("/login");
+            }}
+          >
+            <LogOut />
+            Sign out
+          </button>
+          <Link to="/">
+            <Leaf />
+            Public website
+          </Link>
+        </SidebarFoot>
+      </Sidebar>
+      <Workspace>
+        <Topbar>
+          <button aria-label="Open navigation" onClick={() => setOpen(true)}>
+            <Menu />
+          </button>
+          <div>
+            <span>{friendlyRole(role)}</span>
+            <small>{user.email}</small>
+          </div>
+          <Link to={`/${workspace}/notifications`} aria-label="Notifications">
+            <Bell />
+          </Link>
+        </Topbar>
+        <Content id="workspace-content">
+          {user.accountStatus !== "ACTIVE" &&
+          user.approvalStatus === "PENDING_APPROVAL" &&
+          section === "profile" ? (
+            <PendingApprovalPage />
+          ) : role === "INNOVATOR" ? (
+            <InnovatorSection section={section} id={id} />
+          ) : role === "SYSTEM_ADMINISTRATOR" ? (
+            <AdminSection section={section} id={id} />
+          ) : role === "EXPERT" ? (
+            <ExpertSection section={section} id={id} />
+          ) : (
+            <PartnerSection section={section} id={id} />
+          )}
+        </Content>
+      </Workspace>
+      <Scrim $open={open} onClick={() => setOpen(false)} />
+    </Shell>
+  );
 }
 
-function Dashboard({role}:{role:Role;workspace:string}){
-  const {data,user}=usePlatform();
-  const innovations=data?.innovations ?? [];
-  const assignments=data?.assignments ?? [];
-  const engagements=data?.engagements ?? [];
-  const notifications=data?.notifications ?? [];
-  const title=role==='SYSTEM_ADMINISTRATOR'?'Platform operations':`${friendlyRole(role)} workspace`;
-  const description=role==='SYSTEM_ADMINISTRATOR'
-    ?'Manage real accounts and monitor persistent platform records.'
-    :'Your workspace shows only records authorized for your signed-in account.';
-  return <><PageHeader eyebrow="Secure workspace" title={title} description={description} action={role==='INNOVATOR'?<ButtonLink to="/innovator/innovations/new"><Plus size={17}/> New innovation</ButtonLink>:undefined}/><StatGrid><StatCard label={role==='SYSTEM_ADMINISTRATOR'?'Registered users':'My innovations'} value={role==='SYSTEM_ADMINISTRATOR'?(data?.users.length ?? 0):innovations.length} detail="Stored in PostgreSQL" icon={<Users size={18}/>}/><StatCard label="Assignments" value={assignments.length} detail="Authorized records only" icon={<ClipboardCheck size={18}/>}/><StatCard label="Engagements" value={engagements.length} detail="Non-binding requests" icon={<HeartHandshake size={18}/>}/><StatCard label="Unread notifications" value={notifications.filter(item=>!item.read).length} detail="Account notifications" icon={<Bell size={18}/>}/></StatGrid><Panel><PanelHeader><div><h2>{role==='SYSTEM_ADMINISTRATOR'?'Current platform state':'Your current records'}</h2><p>Welcome, {user?.name}. Sample records are no longer loaded.</p></div></PanelHeader><PanelBody>{innovations.length?<QuickList>{innovations.slice(0,5).map(item=><QuickLink key={item.id} to={role==='INNOVATOR'?`/innovator/innovations/${item.id}`:`/innovations/${item.slug}`} label={item.title} copy={`${item.status} · ${item.sector}`}/>)}</QuickList>:<EmptyState title="No records yet" copy={role==='INNOVATOR'?'Create your first innovation to begin the submission workflow.':'Platform activity will appear here as users create real records.'}/>}</PanelBody></Panel></>;
+function PendingApprovalPage() {
+  const { user } = usePlatform();
+  return (
+    <>
+      <PageHeader
+        eyebrow={`${friendlyRole(user?.role ?? "PUBLIC_USER")} account`}
+        title="Your profile is under review"
+        description="Your information has been submitted to the System Administrator. You can use the workspace after approval."
+      />
+      <ProfileNotice>
+        <ShieldCheck />
+        <span>
+          <strong>Waiting for administrator approval</strong>You do not need to
+          submit again. Check notifications for the decision.
+        </span>
+      </ProfileNotice>
+      <Panel>
+        <PanelBody>
+          <StatusBadge status="PENDING_APPROVAL" />
+          <h2>What happens next</h2>
+          <p>
+            The System Administrator reviews your identity, contact, location,
+            occupation, and role information. If approved, your role dashboard
+            unlocks automatically the next time this page refreshes.
+          </p>
+          <Actions>
+            <ButtonLink to="/discover" $variant="secondary">
+              Browse public innovations
+            </ButtonLink>
+            <ButtonLink
+              to={`/${roleWorkspace[user?.role ?? "PUBLIC_USER"]}/notifications`}
+            >
+              View notifications
+            </ButtonLink>
+          </Actions>
+        </PanelBody>
+      </Panel>
+    </>
+  );
 }
 
-function LegacyDashboard({role,workspace}:{role:Role;workspace:string}){
-  const {data}=usePlatform(); const own=data!.innovations.filter(i=>i.owner==='Keza Nyirabazungu');
-  if(role==='INNOVATOR')return <><PageHeader eyebrow="Innovator workspace" title="Good morning, Keza." description="Keep your innovations moving. Two records need attention this week." action={<ButtonLink to="/innovator/innovations/new"><Plus size={17}/> New innovation</ButtonLink>}/><Alert><FileClock/><div><b>2 revision items need your response</b><span>The earliest response is due July 30.</span></div><ButtonLink to="/innovator/revisions" $variant="secondary">Review items</ButtonLink></Alert><StatGrid><StatCard label="My innovations" value={own.length} detail="Across 4 workflow states" icon={<FolderKanban size={18}/>}/><StatCard label="Open revisions" value={2} detail="1 response submitted" icon={<FileClock size={18}/>}/><StatCard label="Received engagements" value={3} detail="1 new this week" icon={<HeartHandshake size={18}/>}/><StatCard label="Profile completeness" value="92%" detail="Ready for public attribution" icon={<CircleUserRound size={18}/>}/></StatGrid><DashboardGrid><Panel><PanelHeader><div><h2>Your innovation portfolio</h2><p>Current status and next action</p></div><ButtonLink to="/innovator/innovations" $variant="quiet">View all</ButtonLink></PanelHeader>{own.slice(0,4).map(i=><PortfolioRow key={i.id}><Tone $tone={i.imageTone}/><div><Link to={`/innovator/innovations/${i.id}`}>{i.title}</Link><span>{i.sector} · Updated recently</span><ProgressBar value={i.completion}/></div><StatusBadge status={i.status}/></PortfolioRow>)}</Panel><Panel><PanelHeader><div><h2>Next actions</h2><p>Prioritized for you</p></div></PanelHeader><QuickList><QuickLink to="/innovator/revisions" label="Respond to review feedback" copy="2 open field-specific items"/><QuickLink to="/innovator/milestones" label="Update pilot progress" copy="Solar cold chain milestone due"/><QuickLink to="/innovator/engagements" label="Review funding offer" copy="From Isoko Ventures"/></QuickList></Panel></DashboardGrid></>;
-  if(role==='EXPERT')return <><PageHeader eyebrow="Expert workspace" title="Review queue" description="Three assigned innovation versions. One is due within four days." action={<ButtonLink to="/expert/assignments">Open assignments <ArrowRight size={16}/></ButtonLink>}/><StatGrid><StatCard label="Active assignments" value={2} detail="1 due this week" icon={<ClipboardCheck size={18}/>}/><StatCard label="Completed reviews" value={18} detail="+3 this month" icon={<CheckCircle2 size={18}/>}/><StatCard label="Average turnaround" value="5.2d" detail="Within 7-day target" icon={<History size={18}/>}/><StatCard label="Average score" value="71" detail="Across all submitted reviews" icon={<BarChart3 size={18}/>}/></StatGrid><DashboardGrid><Panel><PanelHeader><div><h2>Assigned reviews</h2><p>Only versions assigned to you appear here</p></div></PanelHeader>{data!.assignments.map(a=><ListLink key={a.id} to={`/expert/reviews/${a.id}`} title={a.innovation} meta={`${a.sector} · Due ${a.dueAt}`} status={a.status}/>)}</Panel><Panel><PanelHeader><div><h2>Review distribution</h2><p>Current workload by sector</p></div></PanelHeader><PanelBody><DonutWrap><Donut/><div><b>3</b><span>assigned</span></div></DonutWrap><Legend><span><i/>Agriculture <b>50%</b></span><span><i/>Education <b>25%</b></span><span><i/>Climate & Energy <b>25%</b></span></Legend></PanelBody></Panel></DashboardGrid></>;
-  if(role==='INVESTOR_PARTNER')return <><PageHeader eyebrow="Investor / Partner workspace" title="Opportunity portfolio" description="Track saved innovations and structured engagement requests in one place." action={<ButtonLink to="/partner/discover"><Compass size={17}/> Discover innovations</ButtonLink>}/><SafetyNotice><ShieldCheck/><p>LIDKEP records non-binding opportunities. It does not transfer funds, guarantee investment, or create legal contracts.</p></SafetyNotice><StatGrid><StatCard label="Saved opportunities" value={3} detail="1 newly published" icon={<Archive size={18}/>}/><StatCard label="Active engagements" value={2} detail="Across funding and partnership" icon={<HeartHandshake size={18}/>}/><StatCard label="Accepted connections" value={1} detail="Contact consent granted" icon={<UserCheck size={18}/>}/><StatCard label="Sectors tracked" value={4} detail="Based on your interests" icon={<Layers3 size={18}/>}/></StatGrid><DashboardGrid><Panel><PanelHeader><div><h2>Active engagements</h2><p>Private to participants and Administrators</p></div></PanelHeader>{data!.engagements.map(e=><ListLink key={e.id} to={`/partner/engagements/${e.id}`} title={e.innovation} meta={`${e.type.replaceAll('_',' ')} · ${e.createdAt}`} status={e.status}/>)}</Panel><Panel><PanelHeader><div><h2>Suggested opportunities</h2><p>Based on verified interest sectors</p></div></PanelHeader>{data!.innovations.filter(i=>i.status==='PUBLISHED').slice(0,3).map(i=><ListLink key={i.id} to={`/innovations/${i.slug}`} title={i.title} meta={`${i.sector} · ${i.maturity}`}/>)}</Panel></DashboardGrid></>;
-  return <><PageHeader eyebrow="System administration" title="Platform operations" description="Monitor trusted publication, verification, evaluation, engagement, and system health." action={<ButtonLink to="/admin/reports"><BarChart3 size={17}/> Generate report</ButtonLink>}/><StatGrid><StatCard label="Pending verifications" value={3} detail="Oldest: 5 days" icon={<UserCheck size={18}/>}/><StatCard label="In review" value={24} detail="7 due this week" icon={<ClipboardCheck size={18}/>}/><StatCard label="Awaiting decision" value={8} detail="2 ready to publish" icon={<FileCheck2 size={18}/>}/><StatCard label="Moderation reports" value={2} detail="No critical incidents" icon={<MessageSquareWarning size={18}/>}/></StatGrid><DashboardGrid><Panel><PanelHeader><div><h2>Innovation workflow</h2><p>Live registry distribution</p></div><ButtonLink to="/admin/decisions" $variant="quiet">Open decisions</ButtonLink></PanelHeader><WorkflowRows>{[['Drafts',38,20],['Submitted',17,42],['Under review',24,58],['Recommended',8,72],['Published',248,100]].map(([label,value,width])=><div key={label}><span>{label}</span><i><b style={{width:`${width}%`}}/></i><strong>{value}</strong></div>)}</WorkflowRows></Panel><Panel><PanelHeader><div><h2>Recent audit activity</h2><p>Append-only workflow signals</p></div><ButtonLink to="/admin/audit" $variant="quiet">Search audit</ButtonLink></PanelHeader>{data!.auditLogs.slice(0,4).map(a=><AuditItem key={a.id as string}><Activity size={16}/><div><b>{String(a.action).replaceAll('_',' ')}</b><span>{a.actor} · {a.timestamp}</span></div></AuditItem>)}</Panel></DashboardGrid></>;
+function InnovatorSection({ section, id }: { section: string; id?: string }) {
+  if (section === "dashboard") return <InnovatorDashboard />;
+  if (section === "innovations" && id === "new") return <InnovationEditor />;
+  if (section === "innovations" && id) return <InnovationEditor id={id} />;
+  if (section === "innovations") return <InnovationList />;
+  if (section === "progress") return <ProgressPage />;
+  if (section === "revisions") return <RevisionPage />;
+  if (section === "collaborations") return <InnovatorCollaborationsPage />;
+  if (section === "notifications") return <NotificationsPage />;
+  if (section === "profile") return <ProfilePage />;
+  return <NotFoundSection />;
 }
 
-function SectionRouter({role,workspace,section,id}:{role:Role;workspace:string;section:string;id?:string}){
-  if(section==='innovations'&&id==='new')return <InnovationForm/>;
-  if(section==='innovations'&&id)return <InnovationWorkspace id={id}/>;
-  if(role==='EXPERT'&&section==='reviews'&&id)return <ExpertReview id={id}/>;
-  if(section==='engagements'&&id)return <EngagementDetail id={id} role={role}/>;
-  if(role==='SYSTEM_ADMINISTRATOR'&&section==='publication'&&id)return <PublicationWorkspace id={id}/>;
-  if(section==='profile')return <ProfilePage role={role}/>;
-  if(section==='notifications')return <NotificationsPage/>;
-  return <GenericSection role={role} workspace={workspace} section={section}/>;
+function ExpertSection({ section, id }: { section: string; id?: string }) {
+  if (section === "dashboard") return <ExpertDashboard />;
+  if (section === "assignments")
+    return <ExpertAssignmentsPage selectedId={id} />;
+  if (section === "history") return <ExpertHistoryPage />;
+  if (section === "notifications") return <NotificationsPage />;
+  if (section === "profile") return <ProfilePage />;
+  return <NotFoundSection />;
 }
 
-function GenericSection({role,workspace,section}:{role:Role;workspace:string;section:string}){
-  const {data,notify}=usePlatform();
-  if(section==='innovations')return <><PageHeader eyebrow="Innovation registry" title="My innovations" description="Draft, submit, revise and track your owned innovation records." action={<ButtonLink to="/innovator/innovations/new"><Plus size={16}/> New innovation</ButtonLink>}/><CardGrid>{data!.innovations.filter(i=>i.owner==='Keza Nyirabazungu').map(i=><InnovationTile key={i.id}><Tone $tone={i.imageTone}/><div><StatusBadge status={i.status}/><h2><Link to={`/innovator/innovations/${i.id}`}>{i.title}</Link></h2><p>{i.summary}</p><span>{i.completion}% complete</span><ProgressBar value={i.completion}/></div></InnovationTile>)}</CardGrid></>;
-  if(section==='discover'||section==='opportunities')return <><PageHeader eyebrow={section==='discover'?'Partner discovery':'Private saved list'} title={section==='discover'?'Discover opportunities':'Saved opportunities'} description="Explore approved public records and track relevant opportunities privately." action={section==='opportunities'?<ButtonLink to="/partner/discover"><Compass size={16}/> Discover more</ButtonLink>:undefined}/><CardGrid>{data!.innovations.filter(i=>i.status==='PUBLISHED').map(i=><OpportunityTile key={i.id}><Tone $tone={i.imageTone}/><div><StatusBadge status={i.status}/><h2>{i.title}</h2><p>{i.summary}</p><footer><span>{i.sector} · {i.maturity}</span><ButtonLink to={`/partner/engagements/new?innovation=${i.id}`} $variant="secondary">Engage</ButtonLink></footer></div></OpportunityTile>)}</CardGrid></>;
-  if(section==='assignments')return <><PageHeader eyebrow="Expert evaluation" title={role==='SYSTEM_ADMINISTRATOR'?'Expert assignments':'Assigned review queue'} description={role==='SYSTEM_ADMINISTRATOR'?'Assign submitted versions to verified Experts and monitor due dates.':'Only innovation versions assigned to your verified Expert account are visible.'} action={role==='SYSTEM_ADMINISTRATOR'?<Button onClick={()=>notify('Assignment dialog opened in demo')}><Plus size={16}/> Create assignment</Button>:undefined}/><Panel><TableWrap><Table><thead><tr><th>Innovation version</th><th>Sector</th><th>Expert</th><th>Due date</th><th>Status</th><th>Action</th></tr></thead><tbody>{data!.assignments.map(a=><tr key={a.id}><td><b>{a.innovation}</b><br/><small>Version {a.version}</small></td><td>{a.sector}</td><td>{a.expert}</td><td>{a.dueAt}</td><td><StatusBadge status={a.status}/></td><td><Link to={role==='EXPERT'?`/expert/reviews/${a.id}`:`/admin/assignments/${a.id}`}>Open</Link></td></tr>)}</tbody></Table></TableWrap></Panel></>;
-  if(section==='reviews'||section==='history')return <><PageHeader eyebrow="Expert evaluation" title={section==='history'?'Review history':'Reviews and feedback'} description={section==='history'?'Immutable submitted reviews assigned to your Expert account.':'Criterion scores, recommendations, and review feedback by innovation version.'}/><Panel>{data!.assignments.map(a=><ListLink key={a.id} to={`/${workspace}/reviews/${a.id}`} title={a.innovation} meta={`Version ${a.version} · Score ${a.score}/100 · Due ${a.dueAt}`} status={a.status}/>)}</Panel></>;
-  if(section==='revisions')return <><PageHeader eyebrow="Revision workflow" title="Revision items" description="Field-specific requests, Innovator responses, and resolution status remain tied to the reviewed version."/><CardGrid>{data!.revisions.map(r=><Panel key={r.id}><PanelBody><StatusBadge status={r.status}/><h2>{r.innovation}</h2><Eyebrow>{r.field}</Eyebrow><p>{r.instruction}</p><small>Due {r.dueAt}</small><ActionRow><Button onClick={()=>notify(role==='INNOVATOR'?'Response saved to the demo':'Revision item marked reviewed')}>{role==='INNOVATOR'?'Respond':'Review response'}</Button></ActionRow></PanelBody></Panel>)}</CardGrid></>;
-  if(section==='engagements')return <><PageHeader eyebrow="Consent-based engagement" title={role==='INNOVATOR'?'Received engagements':'Engagement tracking'} description="Private, non-binding records visible only to participants and authorized Administrators." action={role==='INVESTOR_PARTNER'?<ButtonLink to="/partner/discover"><Plus size={16}/> New engagement</ButtonLink>:undefined}/><Panel>{data!.engagements.map(e=><ListLink key={e.id} to={`/${workspace}/engagements/${e.id}`} title={e.innovation} meta={`${e.partner} · ${e.type.replaceAll('_',' ')} · ${e.createdAt}`} status={e.status}/>)}</Panel></>;
-  if(section==='milestones')return <><PageHeader eyebrow="Progress tracking" title="Milestones and updates" description="Record dated progress, measurable outcomes and appropriately visible evidence." action={<Button onClick={()=>notify('New milestone form opened')}><Plus size={16}/> Add milestone</Button>}/><TimelinePanel>{data!.innovations.filter(i=>i.owner==='Keza Nyirabazungu').flatMap(i=>i.milestones.map(m=>({...m,innovation:i.title}))).map((m,i)=><div key={i}><CheckCircle2/><span><Eyebrow>{m.innovation}</Eyebrow><h3>{m.title}</h3><p>{m.date}</p></span><StatusBadge status={m.status}/></div>)}</TimelinePanel></>;
-  if(section==='users')return <UsersPage/>;
-  if(section==='verifications')return <VerificationPage/>;
-  if(section==='decisions')return <DecisionPage/>;
-  if(section==='publication')return <PublicationList/>;
-  if(section==='moderation')return <ModerationPage/>;
-  if(section==='taxonomies')return <TaxonomiesPage/>;
-  if(section==='criteria')return <CriteriaPage/>;
-  if(section==='reports')return <ReportsPage/>;
-  if(section==='audit')return <AuditPage/>;
-  if(section==='settings')return <SettingsPage/>;
-  return <EmptyState title="Workspace section" copy="This route is ready for its API-backed PostgreSQL module."/>;
+function PartnerSection({ section, id }: { section: string; id?: string }) {
+  if (section === "dashboard") return <PartnerDashboard />;
+  if (section === "discover") return <PartnerDiscoverPage selectedId={id} />;
+  if (section === "opportunities") return <PartnerOpportunitiesPage />;
+  if (section === "notifications") return <NotificationsPage />;
+  if (section === "profile") return <ProfilePage />;
+  return <NotFoundSection />;
 }
 
-function InnovationForm(){
-  const {data,notify}=usePlatform(); const [step,setStep]=useState(1); const [title,setTitle]=useState('Community water quality kiosk'); const steps=['Overview','Challenge','Solution','Evidence','Visibility','Declarations'];
-  return <><PageHeader eyebrow="New innovation draft" title="Document your innovation" description="Save an incomplete draft at any time. Submission becomes available after required sections and declarations are complete." action={<Autosave><Check size={15}/> Saved 10:42</Autosave>}/><FormLayout><StepNav>{steps.map((s,i)=><button key={s} className={step===i+1?'active':''} onClick={()=>setStep(i+1)}><span>{i+1}</span>{s}{i<3&&<Check size={14}/>}</button>)}</StepNav><Panel><PanelHeader><div><h2>{steps[step-1]}</h2><p>Step {step} of {steps.length}</p></div><b>{Math.round((step/steps.length)*100)}%</b></PanelHeader><PanelBody><ProgressBar value={(step/steps.length)*100}/><FormSection>{step===1&&<><FormGrid><Field label="Innovation title *" hint="Use a clear, specific title."><Input value={title} onChange={e=>setTitle(e.target.value)}/></Field><Field label="Sector *"><Select><option>Select a sector</option>{data!.taxonomies.sectors.map(v=><option key={v}>{v}</option>)}</Select></Field><Field label="Category *"><Select>{data!.taxonomies.categories.map(v=><option key={v}>{v}</option>)}</Select></Field><Field label="District *"><Select>{data!.taxonomies.districts.map(v=><option key={v}>{v}</option>)}</Select></Field></FormGrid><Field label="Short summary *" hint="Explain the innovation in 2-3 sentences for discovery cards."><Textarea defaultValue="An affordable kiosk combining water dispensing with visible quality monitoring."/></Field></>}{step===2&&<><Field label="Problem statement *"><Textarea defaultValue="Communities need clearer confidence in drinking water quality at shared collection points."/></Field><Field label="Primary beneficiaries *"><Textarea placeholder="Who experiences this problem, and where?"/></Field></>}{step===3&&<><Field label="Proposed solution *"><Textarea placeholder="Describe how the solution works and why it is appropriate."/></Field><FormGrid><Field label="Maturity level *"><Select>{data!.taxonomies.maturityLevels.map(v=><option key={v}>{v}</option>)}</Select></Field><Field label="Support needed *"><Input placeholder="e.g. Prototype funding"/></Field></FormGrid></>}{step===4&&<UploadBox><UploadCloud size={32}/><h3>Add evidence</h3><p>PDF, DOCX, XLSX, JPG or MP4. Files remain private by default.</p><Button type="button" $variant="secondary">Choose files</Button></UploadBox>}{step===5&&<VisibilityList>{['Title and summary','Problem and solution','Team identity','Evidence files','Progress updates'].map((v,i)=><div key={v}><span><b>{v}</b><small>Choose who can access this information</small></span><Select defaultValue={i<2?'PUBLIC':'REVIEW_TEAM'}><option>PUBLIC</option><option>AUTHENTICATED</option><option>REVIEW_TEAM</option><option>ADMIN_ONLY</option></Select></div>)}</VisibilityList>}{step===6&&<Declaration><ShieldCheck size={28}/><h3>Confirm before submission</h3><label><input type="checkbox"/> I declare that I own or am authorized to submit this innovation.</label><label><input type="checkbox"/> Contributors and organizations are accurately identified.</label><label><input type="checkbox"/> Information supplied is accurate to the best of my knowledge.</label><NoticeText>Publication is not patent registration or intellectual-property certification. Public fields become discoverable only after Expert review and Administrator approval.</NoticeText></Declaration>}</FormSection><FormFooter><Button $variant="secondary" disabled={step===1} onClick={()=>setStep(s=>s-1)}>Previous</Button><Button onClick={()=>step<6?setStep(s=>s+1):notify('Draft validated for demo submission')}>{step<6?'Continue':'Preview submission'} <ArrowRight size={16}/></Button></FormFooter></PanelBody></Panel><SideHelp><Panel><PanelBody><Eyebrow>Draft checklist</Eyebrow><h3>{step<4?'Core information':'Submission readiness'}</h3><Checklist>{steps.map((s,i)=><span key={s} className={i<step?'done':''}>{i<step?<CheckCircle2/>:<i/>}{s}</span>)}</Checklist></PanelBody></Panel><NoticeText>Drafts autosave locally in this demo. PostgreSQL will provide durable multi-session persistence.</NoticeText></SideHelp></FormLayout></>;
+function AdminSection({ section, id }: { section: string; id?: string }) {
+  if (section === "dashboard") return <AdminDashboardPage />;
+  if (section === "users") return <UsersPage selectedId={id} />;
+  if (section === "verifications") return <VerificationsPage selectedId={id} />;
+  if (section === "innovations")
+    return <AdminInnovationsPage selectedId={id} />;
+  if (section === "taxonomies") return <TaxonomiesPage />;
+  if (section === "criteria") return <CriteriaPage />;
+  if (section === "reports") return <ReportsPage />;
+  if (section === "settings") return <SettingsPage />;
+  if (section === "notifications") return <NotificationsPage />;
+  return <NotFoundSection />;
 }
 
-function InnovationWorkspace({id}:{id:string}){
-  const {data,notify}=usePlatform(); const item=data!.innovations.find(i=>i.id===id); if(!item)return <EmptyState title="Innovation not found" copy="The requested record does not exist."/>;
-  return <><PageHeader eyebrow={`Innovation · Version ${item.version||'draft'}`} title={item.title} description={item.summary} action={<><ButtonLink to={`/innovations/${item.slug}`} $variant="secondary">Public preview</ButtonLink><Button onClick={()=>notify('Draft saved')}>Save changes</Button></>}/><Alert><StatusBadge status={item.status}/><div><b>Next action</b><span>{item.status==='REVISION_REQUIRED'?'Respond to open revision items and resubmit a new immutable version.':item.status==='DRAFT'?'Complete required information and declarations.':'Track the current review and decision status.'}</span></div></Alert><Tabs>{['Overview','Versions','Review feedback','Status history','Files'].map(v=><button key={v}>{v}</button>)}</Tabs><DashboardGrid><Panel><PanelHeader><h2>Record overview</h2></PanelHeader><PanelBody><SnapshotGrid>{[['Owner',item.owner],['Organization',item.organization],['Sector',item.sector],['District',item.district],['Maturity',item.maturity],['Support needed',item.supportNeeded]].map(([a,b])=><div key={a}><span>{a}</span><b>{b}</b></div>)}</SnapshotGrid></PanelBody></Panel><Panel><PanelHeader><h2>Completion</h2></PanelHeader><PanelBody><Completion><strong>{item.completion}%</strong><ProgressBar value={item.completion}/><span>Required structured fields completed</span></Completion></PanelBody></Panel></DashboardGrid><Panel><PanelHeader><div><h2>Structured innovation narrative</h2><p>Submitted versions become immutable snapshots.</p></div></PanelHeader><PanelBody><FormGrid><Field label="Problem"><Textarea defaultValue={item.problem}/></Field><Field label="Solution"><Textarea defaultValue={item.solution}/></Field><Field label="Beneficiaries"><Textarea defaultValue={item.beneficiaries}/></Field><Field label="Impact and sustainability"><Textarea defaultValue={`${item.impact}. Sustainability model documented for the next phase.`}/></Field></FormGrid></PanelBody></Panel></>;
+function ManagementPageHeader({
+  icon,
+  eyebrow,
+  title,
+  description,
+  action,
+}: {
+  icon: React.ReactNode;
+  eyebrow: string;
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <ManagementHeader>
+      <ManagementIcon aria-hidden="true">{icon}</ManagementIcon>
+      <ManagementHeading>
+        <Eyebrow>{eyebrow}</Eyebrow>
+        <h1>{title}</h1>
+        <p>{description}</p>
+      </ManagementHeading>
+      {action && <ManagementActions>{action}</ManagementActions>}
+    </ManagementHeader>
+  );
 }
 
-function ExpertReview({id}:{id:string}){
-  const {data,notify}=usePlatform(); const a=data!.assignments.find(v=>v.id===id)||data!.assignments[0]; const review=data!.reviews[0] as {scores:Array<{name:string;score:number;weight:number}>;total:number;recommendation:string}; const [scores,setScores]=useState(review.scores); const total=Math.round(scores.reduce((sum,s)=>sum+s.score*(s.weight/100),0)); const update=(index:number,value:number)=>setScores(old=>old.map((s,i)=>i===index?{...s,score:value}:s));
-  return <><PageHeader eyebrow={`Expert review · ${a.id}`} title={a.innovation} description={`Reviewing immutable version ${a.version}. Criteria version v1.0.`} action={<StatusBadge status={a.status}/>}/><ReviewLayout><div><Panel><PanelHeader><div><h2>1. Screening checklist</h2><p>Complete every required check before recommendation.</p></div></PanelHeader><PanelBody><ChecklistGrid>{['Submission is complete','Ownership declaration present','Duplicate risk considered','Privacy visibility reviewed','Safety concerns assessed','Evidence quality reviewed'].map((v,i)=><label key={v}><input type="checkbox" defaultChecked={i<4}/><span><b>{v}</b><small>{i<4?'Confirmed':'Requires your review'}</small></span></label>)}</ChecklistGrid></PanelBody></Panel><Panel><PanelHeader><div><h2>2. Criterion scoring</h2><p>Scores are weighted according to criteria version v1.0.</p></div></PanelHeader><PanelBody><ScoreList>{scores.map((s,i)=><div key={s.name}><span><b>{s.name}</b><small>Weight {s.weight}%</small></span><input aria-label={`${s.name} score`} type="range" min="0" max="100" value={s.score} onChange={e=>update(i,Number(e.target.value))}/><strong>{s.score}</strong><Textarea aria-label={`${s.name} comment`} placeholder="Criterion-level comment..."/></div>)}</ScoreList></PanelBody></Panel><Panel><PanelHeader><div><h2>3. Recommendation</h2><p>The score informs consistency but never makes the decision automatically.</p></div></PanelHeader><PanelBody><Field label="Expert recommendation"><Select defaultValue={total>=70?'APPROVE':total>=50?'REVISION_REQUIRED':'REJECT'}><option>APPROVE</option><option>REVISION_REQUIRED</option><option>REJECT</option></Select></Field><Field label="Mandatory rationale"><Textarea defaultValue="The problem is well evidenced. Please strengthen the maintenance and replacement model before final approval."/></Field><ActionRow><Button $variant="secondary" onClick={()=>notify('Review draft saved')}>Save draft</Button><Button onClick={()=>notify('Recommendation confirmation opened')}><FileCheck2 size={16}/> Submit recommendation</Button></ActionRow></PanelBody></Panel></div><aside><ScoreCard><Eyebrow>Weighted total</Eyebrow><strong>{total}</strong><span>out of 100</span><StatusBadge status={total>=70?'APPROVE':total>=50?'REVISION_REQUIRED':'REJECT'}/><ProgressBar value={total}/></ScoreCard><NoticeText>Submitted recommendations are immutable unless an authorized Administrator performs an audited reopening.</NoticeText><ButtonLink to={`/innovator/innovations/${a.innovationId}`} $variant="secondary">View submitted version</ButtonLink></aside></ReviewLayout></>;
+function InnovatorDashboard() {
+  const { data, user } = usePlatform();
+  const records = data?.innovations ?? [];
+  const revisions = data?.revisions ?? [];
+  const notifications = data?.notifications ?? [];
+  const localDraft = readLocalInnovationDraft(user?.id);
+  return (
+    <>
+      <PageHeader
+        eyebrow="Innovator workspace"
+        title="Turn your idea into a clear innovation record"
+        description="Create a draft, add supporting documents, record progress, submit for review, and follow every status change."
+        action={
+          <ButtonLink to="/innovator/innovations/new">
+            <Plus />
+            New innovation
+          </ButtonLink>
+        }
+      />
+      {localDraft && (
+        <DraftRecovery>
+          <span>
+            <strong>Unfinished innovation found</strong>
+            <small>
+              {localDraft.title || "Untitled local draft"} was saved in this
+              browser.
+            </small>
+          </span>
+          <ButtonLink to="/innovator/innovations/new">Resume draft</ButtonLink>
+        </DraftRecovery>
+      )}
+      <StatGrid>
+        <StatCard
+          label="My innovations"
+          value={records.length}
+          detail="Owned by your account"
+          icon={<FolderKanban />}
+        />
+        <StatCard
+          label="Drafts"
+          value={records.filter((item) => item.status === "DRAFT").length}
+          detail="Continue editing"
+          icon={<FileText />}
+        />
+        <StatCard
+          label="Open feedback"
+          value={revisions.filter((item) => item.status === "OPEN").length}
+          detail="Expert comments"
+          icon={<ClipboardCheck />}
+        />
+        <StatCard
+          label="Unread updates"
+          value={notifications.filter((item) => !item.read).length}
+          detail="Account notifications"
+          icon={<Bell />}
+        />
+      </StatGrid>
+      <Panel>
+        <PanelHeader>
+          <div>
+            <h2>Recent innovations</h2>
+            <p>Continue from the last saved database record.</p>
+          </div>
+        </PanelHeader>
+        {records.length ? (
+          <RecordList>
+            {records.slice(0, 6).map((item) => (
+              <Link key={item.id} to={`/innovator/innovations/${item.id}`}>
+                <span>
+                  <strong>{item.title}</strong>
+                  <small>
+                    {item.sector || "Sector not selected"} · {item.completion}%
+                    complete
+                  </small>
+                </span>
+                <StatusBadge status={item.status} />
+                <ChevronRight />
+              </Link>
+            ))}
+          </RecordList>
+        ) : (
+          <EmptyState
+            title="Create your first innovation"
+            copy="Complete the required information to save your first database draft. Unfinished entries remain preserved in this browser."
+            action={
+              <ButtonLink to="/innovator/innovations/new">
+                Create innovation
+              </ButtonLink>
+            }
+          />
+        )}
+      </Panel>
+    </>
+  );
 }
 
-function EngagementDetail({id,role}:{id:string;role:Role}){
-  const {data,notify}=usePlatform(); const engagement=id==='new'?null:data!.engagements.find(e=>e.id===id); const isNew=!engagement;
-  return <><PageHeader eyebrow="Structured engagement" title={isNew?'Create an engagement request':engagement!.innovation} description={isNew?'Send a contact, funding, or partnership request to the innovation owner.':`${engagement!.partner} · ${engagement!.type.replaceAll('_',' ')}`} action={!isNew?<StatusBadge status={engagement!.status}/>:undefined}/><SafetyNotice><ShieldCheck/><p>This record is non-binding. LIDKEP does not transfer funds, guarantee investment, or create a legal contract. Contact details are disclosed only after required consent.</p></SafetyNotice><DashboardGrid><Panel><PanelHeader><div><h2>{isNew?'Request details':'Proposal summary'}</h2><p>Private to participants and authorized Administrators</p></div></PanelHeader><PanelBody><FormGrid><Field label="Engagement type"><Select defaultValue={engagement?.type||'CONTACT'}><option>CONTACT</option><option>FUNDING_OFFER</option><option>PARTNERSHIP_REQUEST</option></Select></Field><Field label="Preferred contact method"><Select><option>Platform introduction first</option><option>Email after acceptance</option><option>Phone after acceptance</option></Select></Field></FormGrid><Field label="Purpose and proposed contribution"><Textarea defaultValue={engagement?.summary||'We would like to explore a pilot partnership and provide technical support.'}/></Field><Field label="Terms summary"><Textarea placeholder="Summarize non-binding terms, timelines, and expectations."/></Field><label><input type="checkbox" defaultChecked/> I understand this is a non-binding platform record and no funds are transferred through LIDKEP.</label><ActionRow><Button $variant="secondary">Save draft</Button><Button onClick={()=>notify(isNew?'Engagement request recorded in demo':role==='INNOVATOR'?'Engagement accepted with consent controls':'Clarification request sent')}>{isNew?'Send request':role==='INNOVATOR'?'Accept request':'Request clarification'}</Button></ActionRow></PanelBody></Panel><Panel><PanelHeader><h2>Status history</h2></PanelHeader><PanelBody><TimelinePanel><div><CheckCircle2/><span><h3>Request created</h3><p>{engagement?.createdAt||'Today'} · Partner</p></span><StatusBadge status="COMPLETED"/></div><div><History/><span><h3>Innovator response</h3><p>Awaiting participant action</p></span><StatusBadge status={engagement?.status||'PENDING'}/></div></TimelinePanel></PanelBody></Panel></DashboardGrid></>;
+function ExpertDashboard() {
+  const { data } = usePlatform();
+  const assignments = data?.assignments ?? [];
+  const open = assignments.filter(
+    (item) => !["COMPLETED", "CANCELLED"].includes(item.status),
+  );
+  return (
+    <>
+      <PageHeader
+        eyebrow="Expert workspace"
+        title="Review local innovations with transparent criteria"
+        description="Accept assigned submissions, assess every active criterion, provide actionable comments, and send a recommendation to the System Administrator."
+      />
+      <StatGrid>
+        <StatCard
+          label="Assigned reviews"
+          value={assignments.length}
+          detail="All assignments"
+          icon={<ClipboardCheck />}
+        />
+        <StatCard
+          label="In progress"
+          value={open.length}
+          detail="Awaiting your action"
+          icon={<Activity />}
+        />
+        <StatCard
+          label="Completed"
+          value={
+            assignments.filter((item) => item.status === "COMPLETED").length
+          }
+          detail="Submitted recommendations"
+          icon={<CheckCircle2 />}
+        />
+        <StatCard
+          label="Unread updates"
+          value={
+            (data?.notifications ?? []).filter((item) => !item.read).length
+          }
+          detail="Review notifications"
+          icon={<Bell />}
+        />
+      </StatGrid>
+      <Panel>
+        <PanelHeader>
+          <div>
+            <h2>Current review queue</h2>
+            <p>Assignments are ordered by the most recent activity.</p>
+          </div>
+        </PanelHeader>
+        {open.length ? (
+          <RecordList>
+            {open.map((item) => (
+              <Link key={item.id} to={`/expert/assignments/${item.id}`}>
+                <span>
+                  <strong>{item.innovation}</strong>
+                  <small>
+                    {item.sector || "Sector not provided"} · Version{" "}
+                    {item.version}
+                  </small>
+                </span>
+                <StatusBadge status={item.status} />
+                <ChevronRight />
+              </Link>
+            ))}
+          </RecordList>
+        ) : (
+          <EmptyState
+            title="No reviews awaiting action"
+            copy="New assignments from the System Administrator will appear here."
+          />
+        )}
+      </Panel>
+    </>
+  );
 }
 
-function ProfilePage({role}:{role:Role}){
-  const {user:account,data,notify}=usePlatform(); if(!account)return null;
-  return <><PageHeader eyebrow="Account and verification" title={account.name} description="Manage identity, organization, language, location, contact preference, and evidence." action={<StatusBadge status={account.verified?'VERIFIED':'PENDING_APPROVAL'}/>}/><DashboardGrid><Panel><PanelHeader><div><h2>Profile information</h2><p>Private contact fields never appear in unauthorized API responses.</p></div></PanelHeader><PanelBody><FormGrid><Field label="Display name"><Input defaultValue={account.name}/></Field><Field label="Organization"><Input defaultValue={account.organization}/></Field><Field label="District"><Select defaultValue={account.district}>{data!.taxonomies.districts.map(v=><option key={v}>{v}</option>)}</Select></Field><Field label="Preferred language"><Select><option>English</option><option>Kinyarwanda</option></Select></Field><Field label="Contact preference"><Select><option>Platform introduction first</option><option>Email after consent</option><option>Phone after consent</option></Select></Field><Field label="Profile visibility"><Select><option>Public display name only</option><option>Authenticated users</option><option>Private</option></Select></Field></FormGrid><Field label="Biography / description"><Textarea defaultValue="Working to strengthen Rwanda's innovation ecosystem through responsible collaboration."/></Field><ActionRow><Button onClick={()=>notify('Profile changes saved to demo')}>Save profile</Button></ActionRow></PanelBody></Panel><Panel><PanelHeader><h2>Verification and security</h2></PanelHeader><PanelBody><SecurityList><div><ShieldCheck/><span><b>Account verification</b><small>Approved by System Administrator</small></span><StatusBadge status="ACTIVE"/></div>{(role==='EXPERT'||role==='SYSTEM_ADMINISTRATOR')&&<div><ShieldCheck/><span><b>Multi-factor authentication</b><small>Required for privileged functions</small></span><StatusBadge status={account.mfaEnabled?'ENABLED':'REQUIRED'}/></div>}<div><FileText/><span><b>Verification evidence</b><small>Files are ADMIN_ONLY and never public</small></span><Button $variant="secondary">Manage</Button></div></SecurityList></PanelBody></Panel></DashboardGrid></>;
+function ExpertAssignmentsPage({ selectedId }: { selectedId?: string }) {
+  const { data, request, refreshWorkspace, notify } = usePlatform();
+  const [error, setError] = useState("");
+  const assignments = data?.assignments ?? [];
+  const selected = assignments.find((item) => item.id === selectedId);
+  const accept = async () => {
+    if (!selected) return;
+    try {
+      await request(`/api/v1/reviews/assignments/${selected.id}/accept`, {
+        method: "POST",
+        body: "{}",
+      });
+      await refreshWorkspace();
+      notify("Assignment accepted. The evaluation form is ready.");
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+  if (selectedId && !selected) return <LoadingPanel />;
+  if (selected)
+    return (
+      <>
+        <PageHeader
+          eyebrow="Assigned review"
+          title={selected.innovation}
+          description={`Immutable submitted version ${selected.version}`}
+          action={
+            <ButtonLink to="/expert/assignments" $variant="secondary">
+              <ArrowLeft />
+              All assignments
+            </ButtonLink>
+          }
+        />
+        {error && <ErrorBox>{error}</ErrorBox>}
+        <Panel>
+          <PanelBody>
+            <StatusBadge status={selected.status} />
+            <DetailGrid>
+              {[
+                ["Sector", selected.sector],
+                ["District", selected.district],
+                [
+                  "Due",
+                  selected.dueAt ? formatDate(selected.dueAt) : "No due date",
+                ],
+              ].map(([label, value]) => (
+                <DetailItem key={label}>
+                  <small>{label}</small>
+                  <strong>{value || "Not provided"}</strong>
+                </DetailItem>
+              ))}
+            </DetailGrid>
+            <NarrativeGrid>
+              {[
+                ["Summary", selected.summary],
+                ["Problem or need", selected.problem],
+                ["Proposed solution", selected.solution],
+                ["Beneficiaries", selected.beneficiaries],
+                ["Expected impact", selected.impact],
+                ["What is new", selected.novelty],
+                ["Current evidence", selected.currentEvidence],
+                ["Implementation plan", selected.implementationPlan],
+                ["Scalability", selected.scalability],
+                ["Sustainability", selected.sustainability],
+                ["Support needed", selected.supportNeeded],
+              ].map(([label, value]) => (
+                <section key={label}>
+                  <h3>{label}</h3>
+                  <p>{value || "Not provided"}</p>
+                </section>
+              ))}
+            </NarrativeGrid>
+            {selected.status === "ASSIGNED" && (
+              <Actions>
+                <Button onClick={accept}>
+                  <CheckCircle2 />
+                  Accept assignment
+                </Button>
+              </Actions>
+            )}
+          </PanelBody>
+        </Panel>
+        {["ACCEPTED", "IN_PROGRESS"].includes(selected.status) && (
+          <ExpertReviewEditor assignment={selected} />
+        )}
+        {["COMPLETED", "REVISION_REQUESTED"].includes(selected.status) &&
+          selected.review && <SubmittedReviewPanel assignment={selected} />}
+      </>
+    );
+  return (
+    <>
+      <PageHeader
+        eyebrow="Expert evaluation"
+        title="Assigned innovation reviews"
+        description="Only submissions assigned to your account are visible here."
+      />
+      <Panel>
+        {assignments.length ? (
+          <TableWrap>
+            <Table>
+              <thead>
+                <tr>
+                  <th>Innovation</th>
+                  <th>Version</th>
+                  <th>Due</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {assignments.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <strong>{item.innovation}</strong>
+                      <br />
+                      <small>{item.sector || "No sector"}</small>
+                    </td>
+                    <td>{item.version}</td>
+                    <td>{item.dueAt ? formatDate(item.dueAt) : "Not set"}</td>
+                    <td>
+                      <StatusBadge status={item.status} />
+                    </td>
+                    <td>
+                      <ButtonLink
+                        to={`/expert/assignments/${item.id}`}
+                        $variant="secondary"
+                      >
+                        Open review
+                      </ButtonLink>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </TableWrap>
+        ) : (
+          <EmptyState
+            title="No assignments"
+            copy="The System Administrator has not assigned an innovation to you yet."
+          />
+        )}
+      </Panel>
+    </>
+  );
 }
 
-function NotificationsPage(){const {data,notify}=usePlatform();return <><PageHeader eyebrow="Notification centre" title="Notifications" description="Verification, submission, assignment, review, decision, publication, and engagement updates." action={<Button $variant="secondary" onClick={()=>notify('All notifications marked as read')}>Mark all read</Button>}/><Panel>{data!.notifications.map(n=><NotificationRow key={n.id} $unread={!n.read}><span><Bell/></span><div><b>{n.title}</b><p>{n.message}</p><small>{n.time}</small></div>{!n.read&&<i/>}</NotificationRow>)}</Panel></>}
+function ExpertReviewEditor({ assignment }: { assignment: Assignment }) {
+  const { request, refreshWorkspace, notify } = usePlatform();
+  const [scores, setScores] = useState<
+    Record<string, { score: number; comment: string }>
+  >(() =>
+    Object.fromEntries(
+      (assignment.criteria ?? []).map((criterion) => {
+        const saved = assignment.review?.scores.find(
+          (item) => item.criterionKey === criterion.key,
+        );
+        return [
+          criterion.key,
+          { score: saved?.score ?? 0, comment: saved?.comment ?? "" },
+        ];
+      }),
+    ),
+  );
+  const [rationale, setRationale] = useState(
+    assignment.review?.rationale ?? "",
+  );
+  const [recommendation, setRecommendation] = useState(
+    assignment.review?.recommendation ?? "",
+  );
+  const [revision, setRevision] = useState({
+    fieldKey: "solution",
+    instruction: "",
+    dueAt: "",
+  });
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const payload = () => ({
+    scores: (assignment.criteria ?? []).map((criterion) => ({
+      criterionKey: criterion.key,
+      score: scores[criterion.key]?.score ?? 0,
+      comment: scores[criterion.key]?.comment || undefined,
+    })),
+    rationale,
+    recommendation: recommendation || undefined,
+    revisionRequests:
+      recommendation === "REVISION_REQUIRED" && revision.instruction.trim()
+        ? [revision]
+        : [],
+  });
+  const save = async (submit = false) => {
+    setBusy(true);
+    setError("");
+    try {
+      await request(`/api/v1/reviews/assignments/${assignment.id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload()),
+      });
+      if (submit)
+        await request(`/api/v1/reviews/assignments/${assignment.id}/submit`, {
+          method: "POST",
+          body: "{}",
+        });
+      await refreshWorkspace();
+      notify(
+        submit
+          ? "Expert recommendation submitted to the System Administrator."
+          : "Evaluation draft saved.",
+      );
+    } catch (cause) {
+      setError(messageOf(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Panel>
+      <PanelHeader>
+        <div>
+          <h2>Evaluation criteria</h2>
+          <p>
+            Score every criterion from 0 to 5 and explain the evidence behind
+            the score.
+          </p>
+        </div>
+      </PanelHeader>
+      <PanelBody>
+        {error && <ErrorBox role="alert">{error}</ErrorBox>}
+        <CriteriaList>
+          {(assignment.criteria ?? []).map((criterion) => (
+            <section key={criterion.key}>
+              <div>
+                <strong>{criterion.name}</strong>
+                <small>
+                  {criterion.weight}% ·{" "}
+                  {criterion.guidance ||
+                    "Use the submitted information and evidence."}
+                </small>
+              </div>
+              <Field label={`Score for ${criterion.name}`}>
+                <Select
+                  aria-label={`Score for ${criterion.name}`}
+                  value={scores[criterion.key]?.score ?? 0}
+                  onChange={(event) =>
+                    setScores({
+                      ...scores,
+                      [criterion.key]: {
+                        ...scores[criterion.key],
+                        score: Number(event.target.value),
+                      },
+                    })
+                  }
+                >
+                  {[0, 1, 2, 3, 4, 5].map((value) => (
+                    <option key={value} value={value}>
+                      {value} / 5
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Criterion comment">
+                <Textarea
+                  value={scores[criterion.key]?.comment ?? ""}
+                  onChange={(event) =>
+                    setScores({
+                      ...scores,
+                      [criterion.key]: {
+                        ...scores[criterion.key],
+                        comment: event.target.value,
+                      },
+                    })
+                  }
+                />
+              </Field>
+            </section>
+          ))}
+        </CriteriaList>
+        <FormGrid>
+          <Field label="Recommendation">
+            <Select
+              value={recommendation}
+              onChange={(event) => setRecommendation(event.target.value)}
+            >
+              <option value="">Select recommendation</option>
+              <option value="APPROVE">Recommend approval</option>
+              <option value="REVISION_REQUIRED">Request revisions</option>
+              <option value="REJECT">Recommend rejection</option>
+            </Select>
+          </Field>
+          <Field label="Overall rationale">
+            <Textarea
+              value={rationale}
+              onChange={(event) => setRationale(event.target.value)}
+              placeholder="Summarize the evidence and reasoning behind your recommendation."
+            />
+          </Field>
+        </FormGrid>
+        {recommendation === "REVISION_REQUIRED" && (
+          <FormGrid>
+            <Field label="Field requiring revision">
+              <Select
+                value={revision.fieldKey}
+                onChange={(event) =>
+                  setRevision({ ...revision, fieldKey: event.target.value })
+                }
+              >
+                {[
+                  "summary",
+                  "problem",
+                  "solution",
+                  "beneficiaries",
+                  "impact",
+                  "novelty",
+                  "currentEvidence",
+                  "implementationPlan",
+                  "scalability",
+                  "sustainability",
+                  "supportNeeded",
+                ].map((field) => (
+                  <option key={field} value={field}>
+                    {field.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Revision due date (optional)">
+              <Input
+                type="date"
+                value={revision.dueAt}
+                onChange={(event) =>
+                  setRevision({ ...revision, dueAt: event.target.value })
+                }
+              />
+            </Field>
+            <Field label="Clear revision instruction">
+              <Textarea
+                value={revision.instruction}
+                onChange={(event) =>
+                  setRevision({ ...revision, instruction: event.target.value })
+                }
+              />
+            </Field>
+          </FormGrid>
+        )}
+        <AttachmentNotice>
+          <CircleAlert />
+          <span>
+            <strong>The System Administrator makes the final decision.</strong>
+            Your score and recommendation support that decision but do not
+            publish or reject the innovation automatically.
+          </span>
+        </AttachmentNotice>
+        <Actions>
+          <Button
+            $variant="secondary"
+            disabled={busy}
+            onClick={() => save(false)}
+          >
+            <Save />
+            Save draft
+          </Button>
+          <Button
+            disabled={busy || !recommendation || !rationale.trim()}
+            onClick={() => save(true)}
+          >
+            <Send />
+            Submit recommendation
+          </Button>
+        </Actions>
+      </PanelBody>
+    </Panel>
+  );
+}
 
-function UsersPage(){const {data}=usePlatform();return <><PageHeader eyebrow="Identity administration" title="Users and account states" description="Only System Administrators can change role or verification state. Every change is audited."/><Panel><TableWrap><Table><thead><tr><th>User</th><th>Role</th><th>District</th><th>Verification</th><th>Account status</th><th>Action</th></tr></thead><tbody>{data!.users.map(a=><tr key={a.id}><td><b>{a.name}</b><br/><small>{a.email}</small></td><td>{friendlyRole(a.role)}</td><td>{a.district}</td><td><StatusBadge status={a.verified?'VERIFIED':'PENDING'}/></td><td><StatusBadge status={a.accountStatus}/></td><td><Link to={`/admin/users/${a.id}`}>Manage</Link></td></tr>)}</tbody></Table></TableWrap></Panel></>}
+function SubmittedReviewPanel({ assignment }: { assignment: Assignment }) {
+  const review = assignment.review!;
+  return (
+    <Panel>
+      <PanelHeader>
+        <div>
+          <h2>Submitted recommendation</h2>
+          <p>This evaluation is read-only.</p>
+        </div>
+        <StatusBadge status={review.recommendation} />
+      </PanelHeader>
+      <PanelBody>
+        <DetailGrid>
+          <DetailItem>
+            <small>Weighted score</small>
+            <strong>{review.totalScore?.toFixed(1) ?? "Not available"}%</strong>
+          </DetailItem>
+          <DetailItem>
+            <small>Submitted</small>
+            <strong>
+              {review.submittedAt
+                ? formatDate(review.submittedAt)
+                : "Not submitted"}
+            </strong>
+          </DetailItem>
+        </DetailGrid>
+        <SectionBlock>
+          <h3>Rationale</h3>
+          <p>{review.rationale}</p>
+        </SectionBlock>
+      </PanelBody>
+    </Panel>
+  );
+}
 
-function VerificationPage(){const {data,notify}=usePlatform();return <><PageHeader eyebrow="Account verification" title="Verification queue" description="Review qualifications, organizational evidence, and required profile information."/><CardGrid>{data!.verifications.map(v=><Panel key={String(v.id)}><PanelBody><StatusBadge status={String(v.status)}/><h2>{String(v.name)}</h2><p>{String(v.organization)}</p><MetaLine><span>{friendlyRole(String(v.role) as Role)}</span><span>{v.evidence} evidence files</span></MetaLine><ActionRow><Button $variant="secondary" onClick={()=>notify('Additional evidence requested')}>Request information</Button><Button onClick={()=>notify('Verification approved and audited')}><Check size={16}/> Approve</Button></ActionRow></PanelBody></Panel>)}</CardGrid></>}
+function ExpertHistoryPage() {
+  const { data } = usePlatform();
+  const completed = (data?.assignments ?? []).filter((item) =>
+    ["COMPLETED", "REVISION_REQUESTED"].includes(item.status),
+  );
+  return (
+    <>
+      <PageHeader
+        eyebrow="Expert history"
+        title="Submitted evaluations"
+        description="Review the recommendations you have already sent."
+      />
+      <Panel>
+        {completed.length ? (
+          <RecordList>
+            {completed.map((item) => (
+              <Link key={item.id} to={`/expert/assignments/${item.id}`}>
+                <span>
+                  <strong>{item.innovation}</strong>
+                  <small>
+                    {item.review?.recommendation?.replaceAll("_", " ")} ·{" "}
+                    {item.review?.totalScore?.toFixed(1) ?? "0"}%
+                  </small>
+                </span>
+                <StatusBadge status={item.status} />
+                <ChevronRight />
+              </Link>
+            ))}
+          </RecordList>
+        ) : (
+          <EmptyState
+            title="No submitted evaluations"
+            copy="Completed reviews will appear here."
+          />
+        )}
+      </Panel>
+    </>
+  );
+}
 
-function DecisionPage(){const {data,notify}=usePlatform();const records=data!.innovations.filter(i=>['UNDER_REVIEW','REVISION_REQUIRED'].includes(i.status));return <><PageHeader eyebrow="Administrator decision" title="Innovation decisions" description="Approve, reject, return for revision, or archive through validated and audited transitions."/><Panel>{records.map(i=><DecisionRow key={i.id}><Tone $tone={i.imageTone}/><div><StatusBadge status={i.status}/><h3>{i.title}</h3><span>Version {i.version} · {i.sector} · Expert score {i.id==='smart-irrigation'?68:57}</span></div><div><Button $variant="secondary" onClick={()=>notify('Revision decision form opened')}>Return</Button><Button onClick={()=>notify('Approval confirmation opened')}>Approve</Button></div></DecisionRow>)}</Panel></>}
+function PartnerDashboard() {
+  const { data } = usePlatform();
+  const engagements = data?.engagements ?? [];
+  return (
+    <>
+      <PageHeader
+        eyebrow="Investor / Industry Partner workspace"
+        title="Find promising local innovations and engage responsibly"
+        description="Search approved public work, send a structured non-binding request, and track every opportunity."
+        action={
+          <ButtonLink to="/partner/discover">
+            <Search />
+            Discover innovations
+          </ButtonLink>
+        }
+      />
+      <StatGrid>
+        <StatCard
+          label="Published innovations"
+          value={(data?.innovations ?? []).length}
+          detail="Available to explore"
+          icon={<FolderKanban />}
+        />
+        <StatCard
+          label="Open opportunities"
+          value={
+            engagements.filter((item) =>
+              ["PENDING", "CLARIFICATION_REQUESTED"].includes(item.status),
+            ).length
+          }
+          detail="Awaiting action"
+          icon={<BriefcaseBusiness />}
+        />
+        <StatCard
+          label="Accepted"
+          value={
+            engagements.filter((item) => item.status === "ACCEPTED").length
+          }
+          detail="Consent-controlled contacts"
+          icon={<Handshake />}
+        />
+        <StatCard
+          label="Unread updates"
+          value={
+            (data?.notifications ?? []).filter((item) => !item.read).length
+          }
+          detail="Opportunity notifications"
+          icon={<Bell />}
+        />
+      </StatGrid>
+      <Panel>
+        <PanelHeader>
+          <div>
+            <h2>Recent opportunities</h2>
+            <p>Funding, partnership, and contact requests.</p>
+          </div>
+        </PanelHeader>
+        {engagements.length ? (
+          <RecordList>
+            {engagements.slice(0, 6).map((item) => (
+              <Link key={item.id} to="/partner/opportunities">
+                <span>
+                  <strong>{item.innovation}</strong>
+                  <small>{item.type.replaceAll("_", " ")}</small>
+                </span>
+                <StatusBadge status={item.status} />
+                <ChevronRight />
+              </Link>
+            ))}
+          </RecordList>
+        ) : (
+          <EmptyState
+            title="No opportunities yet"
+            copy="Browse published innovations and send a structured request when you find a suitable project."
+            action={
+              <ButtonLink to="/partner/discover">Browse innovations</ButtonLink>
+            }
+          />
+        )}
+      </Panel>
+    </>
+  );
+}
 
-function PublicationList(){const {data}=usePlatform();return <><PageHeader eyebrow="Public knowledge" title="Publication workspace" description="Select public fields and files from an approved immutable version before publication."/><Panel>{data!.innovations.filter(i=>['PUBLISHED','UNDER_REVIEW'].includes(i.status)).map(i=><ListLink key={i.id} to={`/admin/publication/${i.id}`} title={i.title} meta={`Version ${i.version} · ${i.sector} · ${i.district}`} status={i.status}/>)}</Panel></>}
+function PartnerDiscoverPage({ selectedId }: { selectedId?: string }) {
+  const { data } = usePlatform();
+  const [query, setQuery] = useState("");
+  const [requestItem, setRequestItem] = useState<Innovation | null>(null);
+  const items = (data?.innovations ?? []).filter(
+    (item) =>
+      !query ||
+      `${item.title} ${item.summary} ${item.sector} ${item.district}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
+  );
+  const selected = (data?.innovations ?? []).find(
+    (item) => item.id === selectedId,
+  );
+  if (selected)
+    return (
+      <>
+        <PageHeader
+          eyebrow="Published innovation"
+          title={selected.title}
+          description={selected.summary}
+          action={
+            <Actions>
+              <ButtonLink to="/partner/discover" $variant="secondary">
+                <ArrowLeft />
+                All innovations
+              </ButtonLink>
+              <Button onClick={() => setRequestItem(selected)}>
+                <Handshake />
+                Start request
+              </Button>
+            </Actions>
+          }
+        />
+        <Panel>
+          <PanelBody>
+            <StatusBadge status={selected.status} />
+            <DetailGrid>
+              {[
+                ["Innovator", selected.owner],
+                ["Organization", selected.organization],
+                ["Sector", selected.sector],
+                ["District", selected.district],
+                ["Maturity", selected.maturity],
+              ].map(([label, value]) => (
+                <DetailItem key={label}>
+                  <small>{label}</small>
+                  <strong>{value || "Not provided"}</strong>
+                </DetailItem>
+              ))}
+            </DetailGrid>
+            <NarrativeGrid>
+              {[
+                ["Problem", selected.problem],
+                ["Solution", selected.solution],
+                ["Expected impact", selected.impact],
+                ["Support needed", selected.supportNeeded],
+              ].map(([label, value]) => (
+                <section key={label}>
+                  <h3>{label}</h3>
+                  <p>{value || "Not provided"}</p>
+                </section>
+              ))}
+            </NarrativeGrid>
+          </PanelBody>
+        </Panel>
+        {requestItem && (
+          <EngagementRequestDialog
+            item={requestItem}
+            onClose={() => setRequestItem(null)}
+          />
+        )}
+      </>
+    );
+  return (
+    <>
+      <PageHeader
+        eyebrow="Innovation discovery"
+        title="Search published innovations"
+        description="Filter the approved public catalogue before starting a collaboration request."
+      />
+      <PartnerSearch>
+        <Search size={19} />
+        <Input
+          aria-label="Search published innovations"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search title, sector, district, or need"
+        />
+      </PartnerSearch>
+      {items.length ? (
+        <CardGrid>
+          {items.map((item) => (
+            <Panel key={item.id}>
+              <PanelBody>
+                <StatusBadge status={item.status} />
+                <h2>{item.title}</h2>
+                <p>{item.summary}</p>
+                <Meta>
+                  <span>{item.sector}</span>
+                  <span>{item.district}</span>
+                </Meta>
+                <Actions>
+                  <ButtonLink
+                    to={`/partner/discover/${item.id}`}
+                    $variant="secondary"
+                  >
+                    View details
+                  </ButtonLink>
+                  <Button onClick={() => setRequestItem(item)}>
+                    Start request
+                  </Button>
+                </Actions>
+              </PanelBody>
+            </Panel>
+          ))}
+        </CardGrid>
+      ) : (
+        <EmptyState
+          title="No published innovations match"
+          copy="Try a broader search term."
+        />
+      )}
+      {requestItem && (
+        <EngagementRequestDialog
+          item={requestItem}
+          onClose={() => setRequestItem(null)}
+        />
+      )}
+    </>
+  );
+}
 
-function PublicationWorkspace({id}:{id:string}){const {data,notify}=usePlatform();const item=data!.innovations.find(i=>i.id===id)||data!.innovations[0];return <><PageHeader eyebrow="Publication preview" title={item.title} description={`Approved immutable version ${item.version}. Confirm exactly what the public will see.`} action={<StatusBadge status={item.status}/>}/><PublicationGrid><Panel><PanelHeader><div><h2>Public fields</h2><p>Only checked fields will appear in public responses.</p></div></PanelHeader><PanelBody><VisibilityList>{['Title and summary','Problem statement','Solution description','Beneficiaries','Innovator display identity','Sector and district','Approved progress updates','Evidence: pilot report'].map((v,i)=><label key={v}><input type="checkbox" defaultChecked={i<7}/><span><b>{v}</b><small>{i===7?'Currently REVIEW_TEAM':'Marked PUBLIC'}</small></span></label>)}</VisibilityList></PanelBody></Panel><Panel><PanelHeader><h2>Public page preview</h2></PanelHeader><PanelBody><PreviewCard><Tone $tone={item.imageTone}/><StatusBadge status="PUBLIC PREVIEW"/><h2>{item.title}</h2><p>{item.summary}</p><small>{item.sector} · {item.district} · {item.maturity}</small></PreviewCard><NoticeText>Publication creates a stable URL referencing this immutable approved version. Later edits cannot silently change this page.</NoticeText><ActionRow><Button $variant="secondary">Save selection</Button><Button onClick={()=>notify('Publication confirmation opened')}><UploadCloud size={16}/> Publish version</Button></ActionRow></PanelBody></Panel></PublicationGrid></>}
+function EngagementRequestDialog({
+  item,
+  onClose,
+}: {
+  item: Innovation;
+  onClose: () => void;
+}) {
+  const { request, refreshWorkspace, notify } = usePlatform();
+  const [type, setType] = useState("CONTACT");
+  const [summary, setSummary] = useState("");
+  const [terms, setTerms] = useState("");
+  const [accepted, setAccepted] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await request("/api/v1/engagements", {
+        method: "POST",
+        body: JSON.stringify({
+          innovationId: item.id,
+          type,
+          summary,
+          termsSummary: terms || undefined,
+          nonBindingAccepted: accepted,
+        }),
+      });
+      await refreshWorkspace();
+      notify("Collaboration request sent to the Innovator.");
+      onClose();
+    } catch (cause) {
+      setError(messageOf(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <ModalBackdrop role="presentation">
+      <Modal role="dialog" aria-modal="true" aria-labelledby="engagement-title">
+        <PanelHeader>
+          <div>
+            <h2 id="engagement-title">Start a request</h2>
+            <p>{item.title}</p>
+          </div>
+          <button aria-label="Close" onClick={onClose}>
+            <X />
+          </button>
+        </PanelHeader>
+        <PanelBody>
+          {error && <ErrorBox>{error}</ErrorBox>}
+          <Field label="Request type">
+            <Select
+              value={type}
+              onChange={(event) => setType(event.target.value)}
+            >
+              <option value="CONTACT">Contact Innovator</option>
+              <option value="FUNDING_OFFER">Funding offer</option>
+              <option value="PARTNERSHIP_REQUEST">Partnership request</option>
+            </Select>
+          </Field>
+          <Field label="Purpose and proposed next step">
+            <Textarea
+              value={summary}
+              onChange={(event) => setSummary(event.target.value)}
+            />
+          </Field>
+          <Field label="Outline of terms (optional)">
+            <Textarea
+              value={terms}
+              onChange={(event) => setTerms(event.target.value)}
+            />
+          </Field>
+          <CheckLabel>
+            <input
+              type="checkbox"
+              checked={accepted}
+              onChange={(event) => setAccepted(event.target.checked)}
+            />
+            <span>
+              <strong>I understand this request is non-binding.</strong>No
+              payment, contract, or transfer of funds occurs through LIDKEP.
+            </span>
+          </CheckLabel>
+          <Actions>
+            <Button $variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              disabled={busy || !accepted || summary.trim().length < 10}
+              onClick={submit}
+            >
+              <Send />
+              Send request
+            </Button>
+          </Actions>
+        </PanelBody>
+      </Modal>
+    </ModalBackdrop>
+  );
+}
 
-function ModerationPage(){const {notify}=usePlatform();return <><PageHeader eyebrow="Trust and safety" title="Moderation queue" description="Review reported comments and suspicious engagement records. Actions require a reason and create audit events."/><CardGrid>{[['Reported comment','Repeated promotional links on Maternal care companion','REPORTED'],['Suspicious engagement','Unverified payment request reported by an Innovator','REPORTED']].map(([t,c,s])=><Panel key={t}><PanelBody><StatusBadge status={s}/><h2>{t}</h2><p>{c}</p><Field label="Moderation reason"><Textarea placeholder="Required reason for action"/></Field><ActionRow><Button $variant="secondary">Dismiss report</Button><Button $variant="danger" onClick={()=>notify('Moderation action recorded')}>Remove / close</Button></ActionRow></PanelBody></Panel>)}</CardGrid></>}
+function PartnerOpportunitiesPage() {
+  const { data, request, refreshWorkspace, notify } = usePlatform();
+  const [error, setError] = useState("");
+  const withdraw = async (item: Engagement) => {
+    try {
+      await request(`/api/v1/engagements/${item.id}/withdraw`, {
+        method: "POST",
+        body: "{}",
+      });
+      await refreshWorkspace();
+      notify("Opportunity withdrawn.");
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+  const items = data?.engagements ?? [];
+  return (
+    <>
+      <PageHeader
+        eyebrow="Opportunity tracking"
+        title="My collaboration requests"
+        description="Track the response and view contact details only when the Innovator has explicitly shared them."
+      />
+      {error && <ErrorBox>{error}</ErrorBox>}
+      {items.length ? (
+        <CardGrid>
+          {items.map((item) => (
+            <Panel key={item.id}>
+              <PanelBody>
+                <StatusBadge status={item.status} />
+                <h2>{item.innovation}</h2>
+                <p>{item.summary}</p>
+                <Meta>
+                  <span>{item.type.replaceAll("_", " ")}</span>
+                  <span>{formatDate(item.createdAt)}</span>
+                </Meta>
+                {item.status === "ACCEPTED" && (
+                  <SectionBlock>
+                    <h3>Shared contact details</h3>
+                    <p>
+                      {item.contact.email || item.contact.phone
+                        ? [
+                            item.contact.email,
+                            item.contact.phone,
+                            item.contact.organization,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")
+                        : "The Innovator accepted without sharing private contact information."}
+                    </p>
+                  </SectionBlock>
+                )}
+                {["PENDING", "CLARIFICATION_REQUESTED"].includes(
+                  item.status,
+                ) && (
+                  <Actions>
+                    <Button $variant="secondary" onClick={() => withdraw(item)}>
+                      Withdraw request
+                    </Button>
+                  </Actions>
+                )}
+              </PanelBody>
+            </Panel>
+          ))}
+        </CardGrid>
+      ) : (
+        <EmptyState
+          title="No collaboration requests"
+          copy="Requests sent from published innovations appear here."
+          action={
+            <ButtonLink to="/partner/discover">Discover innovations</ButtonLink>
+          }
+        />
+      )}
+    </>
+  );
+}
 
-function TaxonomiesPage(){const {data,notify}=usePlatform();return <><PageHeader eyebrow="Classification management" title="Taxonomies" description="Manage sectors, categories, maturity levels, innovation types, impact areas, and districts." action={<Button onClick={()=>notify('New taxonomy item form opened')}><Plus size={16}/> Add item</Button>}/><TaxonomyGrid>{Object.entries(data!.taxonomies).map(([key,values])=><Panel key={key}><PanelHeader><h2>{key.replace(/([A-Z])/g,' $1')}</h2><span>{values.length} items</span></PanelHeader><PanelBody><TagCloud>{values.map(v=><span key={v}>{v}</span>)}</TagCloud></PanelBody></Panel>)}</TaxonomyGrid></>}
+function InnovatorCollaborationsPage() {
+  const { data, request, refreshWorkspace, notify } = usePlatform();
+  const [error, setError] = useState("");
+  const respond = async (item: Engagement, status: string) => {
+    try {
+      await request(`/api/v1/engagements/${item.id}/respond`, {
+        method: "POST",
+        body: JSON.stringify({
+          status,
+          shareEmail: status === "ACCEPTED",
+          sharePhone: false,
+        }),
+      });
+      await refreshWorkspace();
+      notify("Collaboration request updated.");
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+  const items = data?.engagements ?? [];
+  return (
+    <>
+      <PageHeader
+        eyebrow="Partner engagement"
+        title="Collaboration requests"
+        description="Review non-binding contact, funding, and partnership requests. Your email is shared only when you accept."
+      />
+      {error && <ErrorBox>{error}</ErrorBox>}
+      {items.length ? (
+        <CardGrid>
+          {items.map((item) => (
+            <Panel key={item.id}>
+              <PanelBody>
+                <StatusBadge status={item.status} />
+                <h2>{item.innovation}</h2>
+                <Meta>
+                  <span>{item.partner}</span>
+                  <span>{item.type.replaceAll("_", " ")}</span>
+                </Meta>
+                <p>{item.summary}</p>
+                {item.termsSummary && (
+                  <SectionBlock>
+                    <h3>Proposed terms</h3>
+                    <p>{item.termsSummary}</p>
+                  </SectionBlock>
+                )}
+                {["PENDING", "CLARIFICATION_REQUESTED"].includes(
+                  item.status,
+                ) && (
+                  <Actions>
+                    <Button onClick={() => respond(item, "ACCEPTED")}>
+                      <CheckCircle2 />
+                      Accept and share email
+                    </Button>
+                    <Button
+                      $variant="secondary"
+                      onClick={() => respond(item, "CLARIFICATION_REQUESTED")}
+                    >
+                      Request clarification
+                    </Button>
+                    <Button
+                      $variant="danger"
+                      onClick={() => respond(item, "DECLINED")}
+                    >
+                      Decline
+                    </Button>
+                  </Actions>
+                )}
+              </PanelBody>
+            </Panel>
+          ))}
+        </CardGrid>
+      ) : (
+        <EmptyState
+          title="No Partner requests"
+          copy="Requests concerning your published innovations will appear here."
+        />
+      )}
+    </>
+  );
+}
 
-function CriteriaPage(){const {data,notify}=usePlatform();const c=data!.criteria[0] as {version:string;name:string;status:string;weights:Record<string,number>};return <><PageHeader eyebrow="Versioned evaluation" title="Evaluation criteria" description="Active weights must total 100%. Completed reviews retain the version and weights used." action={<Button onClick={()=>notify('New criteria version copied from active version')}><Plus size={16}/> New version</Button>}/><Panel><PanelHeader><div><h2>{c.name}</h2><p>{c.version} · Active since January 2026</p></div><StatusBadge status={c.status}/></PanelHeader><PanelBody><CriteriaList>{Object.entries(c.weights).map(([name,weight])=><div key={name}><span><b>{name}</b><small>Evaluation focus and guidance configured</small></span><strong>{weight}%</strong></div>)}</CriteriaList><TotalLine><span>Total active weight</span><strong>100%</strong></TotalLine></PanelBody></Panel></>}
+function InnovationList() {
+  const { data, user } = usePlatform();
+  const records = data?.innovations ?? [];
+  const localDraft = readLocalInnovationDraft(user?.id);
+  return (
+    <>
+      <PageHeader
+        eyebrow="Innovation records"
+        title="My innovations"
+        description="Saved drafts stay here so you can close the page and resume later."
+        action={
+          <ButtonLink to="/innovator/innovations/new">
+            <Plus />
+            New innovation
+          </ButtonLink>
+        }
+      />
+      {localDraft && (
+        <DraftRecovery>
+          <span>
+            <strong>Unfinished local draft</strong>
+            <small>
+              {localDraft.title || "Untitled innovation"} has not been saved to
+              the database yet.
+            </small>
+          </span>
+          <ButtonLink to="/innovator/innovations/new">Resume draft</ButtonLink>
+        </DraftRecovery>
+      )}
+      {records.length ? (
+        <CardGrid>
+          {records.map((item) => (
+            <InnovationCard key={item.id} item={item} />
+          ))}
+        </CardGrid>
+      ) : (
+        !localDraft && (
+          <EmptyState
+            title="No innovations yet"
+            copy="Create a draft to start documenting your work."
+            action={
+              <ButtonLink to="/innovator/innovations/new">
+                Create innovation
+              </ButtonLink>
+            }
+          />
+        )
+      )}
+    </>
+  );
+}
 
-function ReportsPage(){const {notify}=usePlatform();return <><PageHeader eyebrow="Authorized reporting" title="Reports and exports" description="Every export respects role, scope, visibility, filters, and audit logging."/><ReportGrid>{[['Innovation registry','Published and authorized registry fields','CSV, PDF'],['Workflow turnaround','Submission, review and publication timing','CSV, PDF'],['Sector and impact summary','District, maturity, category and impact aggregates','CSV, PDF'],['Expert assignments','Workload, completion and recommendations','CSV'],['Engagement summary','Status and type without private proposal fields','CSV'],['User and verification audit','Role, verification and moderation history','CSV, PDF']].map(([t,c,f])=><Panel key={t}><PanelBody><ReportIcon><FileText/></ReportIcon><h2>{t}</h2><p>{c}</p><small>{f}</small><Button $variant="secondary" onClick={()=>notify(`${t} export queued and audit-logged`)}>Generate export</Button></PanelBody></Panel>)}</ReportGrid></>}
+function InnovationCard({ item }: { item: Innovation }) {
+  const editable = ["DRAFT", "REVISION_REQUIRED"].includes(item.status);
+  return (
+    <Panel>
+      <PanelBody>
+        <StatusBadge status={item.status} />
+        <h2>{item.title}</h2>
+        <p>
+          {item.summary || "Complete the summary to describe this innovation."}
+        </p>
+        <Meta>
+          <span>{item.sector || "No sector"}</span>
+          <span>{item.completion}% complete</span>
+        </Meta>
+        <ButtonLink
+          to={`/innovator/innovations/${item.id}`}
+          $variant="secondary"
+        >
+          {editable ? "Resume draft" : "View record"}
+        </ButtonLink>
+      </PanelBody>
+    </Panel>
+  );
+}
 
-function AuditPage(){const {data}=usePlatform();return <><PageHeader eyebrow="Restricted administration" title="Audit logs" description="Search append-only authentication, workflow, sensitive access, export, and settings events."/><FilterRow><Input placeholder="Search actor, action or object"/><Input type="date"/><Input type="date"/><Button><Search size={16}/> Search</Button></FilterRow><Panel><TableWrap><Table><thead><tr><th>Timestamp</th><th>Actor</th><th>Action</th><th>Object</th><th>Request ID</th></tr></thead><tbody>{data!.auditLogs.map(a=><tr key={a.id}><td>{a.timestamp}</td><td><b>{a.actor}</b></td><td><StatusBadge status={a.action}/></td><td>{a.object}</td><td><code>{a.requestId}</code></td></tr>)}</tbody></Table></TableWrap></Panel></>}
+const emptyInnovation = {
+  title: "",
+  summary: "",
+  problem: "",
+  solution: "",
+  beneficiaries: "",
+  sector: "",
+  category: "",
+  district: "",
+  maturity: "",
+  impactArea: "",
+  impact: "",
+  novelty: "",
+  currentEvidence: "",
+  implementationPlan: "",
+  scalability: "",
+  sustainability: "",
+  supportNeeded: "",
+  supportingLinks: [] as Array<{ title: string; url: string }>,
+  ownershipDeclared: false,
+  accuracyDeclared: false,
+};
+type InnovationForm = typeof emptyInnovation;
+const requiredInnovationLabels: Partial<Record<keyof InnovationForm, string>> =
+  {
+    title: "Innovation title",
+    summary: "Short summary",
+    problem: "Problem or need",
+    solution: "Proposed solution",
+    beneficiaries: "Main beneficiaries",
+    sector: "Innovation sector",
+    category: "Innovation type",
+    district: "Project district",
+    maturity: "Maturity level",
+    impactArea: "Primary impact area",
+    impact: "Expected impact",
+    novelty: "What is new or different",
+    implementationPlan: "Implementation plan",
+    scalability: "Potential to scale",
+    sustainability: "Sustainability",
+    supportNeeded: "Support requested",
+    ownershipDeclared: "Ownership declaration",
+    accuracyDeclared: "Accuracy declaration",
+  };
+const narrativeInnovationLabels: Partial<Record<keyof InnovationForm, string>> =
+  {
+    summary: "Short summary",
+    problem: "Problem or need",
+    solution: "Proposed solution",
+    beneficiaries: "Main beneficiaries",
+    impact: "Expected impact",
+    novelty: "What is new or different",
+    currentEvidence: "Evidence so far",
+    implementationPlan: "Implementation plan",
+    scalability: "Potential to scale",
+    sustainability: "Sustainability",
+    supportNeeded: "Support requested",
+  };
+const innovationWordLimit = 50;
+const countWords = (value: string) =>
+  value.trim() ? value.trim().split(/\s+/).length : 0;
+const wordLimitHint = (value: string) =>
+  `${countWords(value)}/${innovationWordLimit} words maximum`;
+const localDraftKey = (userId?: string) =>
+  userId ? `lidkep:innovation-draft:${userId}` : "";
+const hasInnovationContent = (form: InnovationForm) =>
+  Object.entries(form).some(([key, value]) =>
+    key === "supportingLinks"
+      ? Array.isArray(value) && value.length
+      : key === "ownershipDeclared" || key === "accuracyDeclared"
+        ? Boolean(value)
+        : String(value).trim(),
+  );
+function readLocalInnovationDraft(userId?: string): InnovationForm | null {
+  const key = localDraftKey(userId);
+  if (!key) return null;
+  try {
+    const value = JSON.parse(localStorage.getItem(key) ?? "null");
+    return value && typeof value === "object" && hasInnovationContent(value)
+      ? {
+          ...emptyInnovation,
+          ...value,
+          supportingLinks: Array.isArray(value.supportingLinks)
+            ? value.supportingLinks
+            : [],
+        }
+      : null;
+  } catch {
+    return null;
+  }
+}
+const errorsFrom = (cause: unknown): FieldErrors =>
+  cause instanceof ApiRequestError
+    ? Object.fromEntries(
+        cause.fieldErrors.map((item) => [
+          item.field.replace(/^body\./, ""),
+          item.message,
+        ]),
+      )
+    : {};
+const focusFirstError = (errors: FieldErrors, prefix: string) => {
+  const first = Object.keys(errors)[0];
+  if (first)
+    window.requestAnimationFrame(() =>
+      document.getElementById(`${prefix}-${first}`)?.focus(),
+    );
+};
+function validateInnovation(
+  form: InnovationForm,
+  complete = false,
+): FieldErrors {
+  const errors: FieldErrors = {};
+  if (form.title.trim().length < 3)
+    errors.title = "Enter an innovation title with at least 3 characters.";
+  if (complete) {
+    Object.entries(requiredInnovationLabels).forEach(([field, label]) => {
+      const value = form[field as keyof InnovationForm];
+      if (!value || (typeof value === "string" && !value.trim()))
+        errors[field] =
+          field === "ownershipDeclared"
+            ? "Confirm that you own or are authorized to submit this innovation."
+            : field === "accuracyDeclared"
+              ? "Confirm that the information is accurate."
+              : `${label} is required.`;
+    });
+  }
+  Object.entries(narrativeInnovationLabels).forEach(([field, label]) => {
+    const value = form[field as keyof InnovationForm];
+    if (typeof value === "string" && countWords(value) > innovationWordLimit)
+      errors[field] = `${label} must contain 50 words or fewer.`;
+  });
+  return errors;
+}
 
-function SettingsPage(){const {notify}=usePlatform();return <><PageHeader eyebrow="Platform configuration" title="System settings" description="Typed settings are validated, versioned where required, and audit-logged."/><SettingsGrid><Panel><PanelHeader><h2>Discovery and comments</h2></PanelHeader><PanelBody><Setting><span><b>Authenticated comments</b><small>Allow signed-in actors to comment on published innovations.</small></span><input type="checkbox"/></Setting><Setting><span><b>Public statistics</b><small>Expose approved aggregate public statistics.</small></span><input type="checkbox" defaultChecked/></Setting></PanelBody></Panel><Panel><PanelHeader><h2>Files and uploads</h2></PanelHeader><PanelBody><Field label="Maximum document size"><Select><option>10 MB</option><option>25 MB</option></Select></Field><Field label="Maximum video size"><Select><option>100 MB</option><option>250 MB</option></Select></Field></PanelBody></Panel><Panel><PanelHeader><h2>Localization</h2></PanelHeader><PanelBody><Setting><span><b>English</b><small>Primary platform language</small></span><StatusBadge status="ACTIVE"/></Setting><Setting><span><b>Kinyarwanda</b><small>Critical flows and notification templates</small></span><StatusBadge status="ACTIVE"/></Setting></PanelBody></Panel><Panel><PanelHeader><h2>Maintenance mode</h2></PanelHeader><PanelBody><Setting><span><b>Platform availability</b><small>Show maintenance fallback to non-administrator users.</small></span><input type="checkbox"/></Setting></PanelBody></Panel></SettingsGrid><ActionRow><Button onClick={()=>notify('System settings validated and saved')}>Save settings</Button></ActionRow></>}
+function InnovationEditor({ id }: { id?: string }) {
+  const { data, user, request, refreshWorkspace, notify } = usePlatform();
+  const navigate = useNavigate();
+  const record = data?.innovations.find((item) => item.id === id);
+  const [form, setForm] = useState<InnovationForm>(() =>
+    id
+      ? { ...emptyInnovation, supportingLinks: [] }
+      : (readLocalInnovationDraft(user?.id) ?? {
+          ...emptyInnovation,
+          supportingLinks: [],
+        }),
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [files, setFiles] = useState<File[]>([]);
+  const [visibility, setVisibility] = useState("REVIEW_TEAM");
+  const [attachmentError, setAttachmentError] = useState("");
+  const [fileInputKey, setFileInputKey] = useState(0);
+  const [linkTitle, setLinkTitle] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkErrors, setLinkErrors] = useState<FieldErrors>({});
+  useEffect(() => {
+    if (record)
+      setForm({
+        title: record.title,
+        summary: record.summary,
+        problem: record.problem,
+        solution: record.solution,
+        beneficiaries: record.beneficiaries,
+        sector: record.sector,
+        category: record.category,
+        district: record.district,
+        maturity: record.maturity,
+        impactArea: record.impactArea,
+        impact: record.impact,
+        novelty: record.novelty,
+        currentEvidence: record.currentEvidence,
+        implementationPlan: record.implementationPlan,
+        scalability: record.scalability,
+        sustainability: record.sustainability,
+        supportNeeded: record.supportNeeded,
+        supportingLinks: record.supportingLinks ?? [],
+        ownershipDeclared: Boolean(record.ownershipDeclared),
+        accuracyDeclared: Boolean(record.accuracyDeclared),
+      });
+  }, [record?.id]);
+  useEffect(() => {
+    if (id || !user?.id) return;
+    const key = localDraftKey(user.id);
+    if (hasInnovationContent(form))
+      localStorage.setItem(key, JSON.stringify(form));
+    else localStorage.removeItem(key);
+  }, [form, id, user?.id]);
+  const set = <K extends keyof InnovationForm>(
+    key: K,
+    value: InnovationForm[K],
+  ) => {
+    setForm((old) => ({ ...old, [key]: value }));
+    setFieldErrors((old) => {
+      const next = { ...old };
+      delete next[key];
+      return next;
+    });
+  };
+  const persist = () =>
+    request<Innovation>(
+      id ? `/api/v1/innovations/${id}` : "/api/v1/innovations",
+      { method: id ? "PATCH" : "POST", body: JSON.stringify(form) },
+    );
+  const showErrors = (cause: unknown) => {
+    const details = errorsFrom(cause);
+    setError(messageOf(cause));
+    setFieldErrors(details);
+    focusFirstError(details, "innovation");
+  };
+  const save = async () => {
+    const details = validateInnovation(form, true);
+    if (Object.keys(details).length) {
+      setFieldErrors(details);
+      setError("Correct the highlighted fields before saving.");
+      focusFirstError(details, "innovation");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setFieldErrors({});
+    try {
+      const saved = await persist();
+      if (user?.id) localStorage.removeItem(localDraftKey(user.id));
+      await refreshWorkspace();
+      notify(
+        id
+          ? "Innovation draft saved."
+          : "Innovation draft created. You can now upload documents and images.",
+      );
+      if (!id)
+        navigate(`/innovator/innovations/${saved.id}`, { replace: true });
+    } catch (cause) {
+      showErrors(cause);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const submit = async () => {
+    if (!id) return;
+    const details = validateInnovation(form, true);
+    if (Object.keys(details).length) {
+      setFieldErrors(details);
+      setError("Correct the highlighted fields before submitting.");
+      focusFirstError(details, "innovation");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setFieldErrors({});
+    try {
+      await persist();
+      await request(`/api/v1/innovations/${id}/submit`, {
+        method: "POST",
+        body: "{}",
+      });
+      await refreshWorkspace();
+      notify("Innovation submitted to the System Administrator.");
+    } catch (cause) {
+      showErrors(cause);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const upload = async () => {
+    if (!id || !files.length) return;
+    setBusy(true);
+    setAttachmentError("");
+    try {
+      for (const selectedFile of files) {
+        const body = new FormData();
+        body.append("file", selectedFile);
+        body.append("visibility", visibility);
+        await request(`/api/v1/innovations/${id}/evidence`, {
+          method: "POST",
+          body,
+        });
+      }
+      await refreshWorkspace();
+      setFiles([]);
+      setFileInputKey((value) => value + 1);
+      notify(
+        `${files.length} supporting file${files.length === 1 ? "" : "s"} uploaded.`,
+      );
+    } catch (cause) {
+      setAttachmentError(messageOf(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const addLink = () => {
+    const details: FieldErrors = {};
+    if (linkTitle.trim().length < 2)
+      details.linkTitle = "Enter a short title describing this link.";
+    if (!/^https?:\/\/\S+$/i.test(linkUrl.trim()))
+      details.linkUrl =
+        "Enter a complete link beginning with http:// or https://.";
+    if (Object.keys(details).length) {
+      setLinkErrors(details);
+      focusFirstError(details, "support");
+      return;
+    }
+    set("supportingLinks", [
+      ...form.supportingLinks,
+      { title: linkTitle.trim(), url: linkUrl.trim() },
+    ]);
+    setLinkTitle("");
+    setLinkUrl("");
+    setLinkErrors({});
+  };
+  const editable =
+    !record || ["DRAFT", "REVISION_REQUIRED"].includes(record.status);
+  return (
+    <>
+      <PageHeader
+        eyebrow={id ? "Innovation record" : "New innovation"}
+        title={id ? record?.title || "Innovation" : "Create an innovation"}
+        description="Complete the required fields to save a database draft. Documents and images can be uploaded; videos must be added as links."
+        action={
+          <ButtonLink to="/innovator/innovations" $variant="secondary">
+            <ArrowLeft />
+            Back
+          </ButtonLink>
+        }
+      />
+      {record && (
+        <StatusLine>
+          <StatusBadge status={record.status} />
+          <span>
+            {record.completion}% complete · Version {record.version}
+          </span>
+        </StatusLine>
+      )}
+      {!id && hasInnovationContent(form) && (
+        <LocalSaveNotice>
+          <Save />
+          <span>
+            <strong>Local draft recovered and saving automatically</strong>Your
+            unfinished entries remain available in this browser until you create
+            the database draft.
+          </span>
+        </LocalSaveNotice>
+      )}
+      {error && (
+        <ValidationSummary role="alert" aria-live="assertive">
+          <CircleAlert />
+          <div>
+            <strong>{error}</strong>
+            {Object.keys(fieldErrors).length > 0 && (
+              <ul>
+                {Object.entries(fieldErrors).map(([field, message]) => (
+                  <li key={field}>
+                    <button
+                      onClick={() =>
+                        document.getElementById(`innovation-${field}`)?.focus()
+                      }
+                    >
+                      {message}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </ValidationSummary>
+      )}
+      <Panel>
+        <PanelHeader>
+          <div>
+            <h2>Innovation information</h2>
+            <p>
+              Complete the grouped fields with clear, direct information a
+              reviewer can understand.
+            </p>
+          </div>
+        </PanelHeader>
+        <PanelBody>
+          <SectionTitle>Basic information</SectionTitle>
+          <FormGrid>
+            <Field label="Innovation title" error={fieldErrors.title}>
+              <Input
+                id="innovation-title"
+                value={form.title}
+                disabled={!editable}
+                placeholder="Example: Solar-powered crop dryer"
+                onChange={(e) => set("title", e.target.value)}
+              />
+            </Field>
+            <Field label="Innovation sector" error={fieldErrors.sector}>
+              <Select
+                id="innovation-sector"
+                value={form.sector}
+                disabled={!editable}
+                onChange={(e) => set("sector", e.target.value)}
+              >
+                <option value="">Select innovation sector</option>
+                {data?.taxonomies.sectors.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Innovation type" error={fieldErrors.category}>
+              <Select
+                id="innovation-category"
+                value={form.category}
+                disabled={!editable}
+                onChange={(e) => set("category", e.target.value)}
+              >
+                <option value="">Select innovation type</option>
+                {data?.taxonomies.categories.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Project district" error={fieldErrors.district}>
+              <Select
+                id="innovation-district"
+                value={form.district}
+                disabled={!editable}
+                onChange={(e) => set("district", e.target.value)}
+              >
+                <option value="">Select project district</option>
+                {data?.taxonomies.districts.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Maturity level" error={fieldErrors.maturity}>
+              <Select
+                id="innovation-maturity"
+                value={form.maturity}
+                disabled={!editable}
+                onChange={(e) => set("maturity", e.target.value)}
+              >
+                <option value="">Select current maturity</option>
+                {data?.taxonomies.maturityLevels.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Primary impact area" error={fieldErrors.impactArea}>
+              <Select
+                id="innovation-impactArea"
+                value={form.impactArea}
+                disabled={!editable}
+                onChange={(e) => set("impactArea", e.target.value)}
+              >
+                <option value="">Select impact area</option>
+                {data?.taxonomies.impactAreas.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </Select>
+            </Field>
+          </FormGrid>
+          <Field
+            label="Short summary"
+            hint={wordLimitHint(form.summary)}
+            error={fieldErrors.summary}
+          >
+            <Textarea
+              id="innovation-summary"
+              value={form.summary}
+              disabled={!editable}
+              placeholder="Summarize the innovation, who it helps, and its main value."
+              onChange={(e) => set("summary", e.target.value)}
+            />
+          </Field>
+          <SectionTitle>Problem and solution</SectionTitle>
+          <FormGrid>
+            <Field
+              label="Problem or need"
+              hint={wordLimitHint(form.problem)}
+              error={fieldErrors.problem}
+            >
+              <Textarea
+                id="innovation-problem"
+                value={form.problem}
+                disabled={!editable}
+                placeholder="Describe the specific local problem, its causes, and who experiences it."
+                onChange={(e) => set("problem", e.target.value)}
+              />
+            </Field>
+            <Field
+              label="Proposed solution"
+              hint={wordLimitHint(form.solution)}
+              error={fieldErrors.solution}
+            >
+              <Textarea
+                id="innovation-solution"
+                value={form.solution}
+                disabled={!editable}
+                placeholder="Explain how the product, service, or process works in practice."
+                onChange={(e) => set("solution", e.target.value)}
+              />
+            </Field>
+            <Field
+              label="What is new or different?"
+              hint={wordLimitHint(form.novelty)}
+              error={fieldErrors.novelty}
+            >
+              <Textarea
+                id="innovation-novelty"
+                value={form.novelty}
+                disabled={!editable}
+                placeholder="Compare it with existing approaches and state the improvement clearly."
+                onChange={(e) => set("novelty", e.target.value)}
+              />
+            </Field>
+            <Field
+              label="Main beneficiaries"
+              hint={wordLimitHint(form.beneficiaries)}
+              error={fieldErrors.beneficiaries}
+            >
+              <Textarea
+                id="innovation-beneficiaries"
+                value={form.beneficiaries}
+                disabled={!editable}
+                placeholder="Identify users, customers, communities, or institutions that benefit."
+                onChange={(e) => set("beneficiaries", e.target.value)}
+              />
+            </Field>
+          </FormGrid>
+          <SectionTitle>Readiness and expected results</SectionTitle>
+          <FormGrid>
+            <Field
+              label="Evidence so far (optional)"
+              hint={wordLimitHint(form.currentEvidence)}
+              error={fieldErrors.currentEvidence}
+            >
+              <Textarea
+                id="innovation-currentEvidence"
+                value={form.currentEvidence}
+                disabled={!editable}
+                placeholder="Mention tests, prototypes, pilots, user feedback, sales, or measurements already available."
+                onChange={(e) => set("currentEvidence", e.target.value)}
+              />
+            </Field>
+            <Field
+              label="Implementation plan"
+              hint={wordLimitHint(form.implementationPlan)}
+              error={fieldErrors.implementationPlan}
+            >
+              <Textarea
+                id="innovation-implementationPlan"
+                value={form.implementationPlan}
+                disabled={!editable}
+                placeholder="List the next activities, approximate timeline, and resources needed."
+                onChange={(e) => set("implementationPlan", e.target.value)}
+              />
+            </Field>
+            <Field
+              label="Expected impact"
+              hint={wordLimitHint(form.impact)}
+              error={fieldErrors.impact}
+            >
+              <Textarea
+                id="innovation-impact"
+                value={form.impact}
+                disabled={!editable}
+                placeholder="Describe the expected social, economic, or environmental improvement."
+                onChange={(e) => set("impact", e.target.value)}
+              />
+            </Field>
+            <Field
+              label="Potential to scale"
+              hint={wordLimitHint(form.scalability)}
+              error={fieldErrors.scalability}
+            >
+              <Textarea
+                id="innovation-scalability"
+                value={form.scalability}
+                disabled={!editable}
+                placeholder="Explain how this could reach more users, districts, or markets."
+                onChange={(e) => set("scalability", e.target.value)}
+              />
+            </Field>
+            <Field
+              label="Sustainability"
+              hint={wordLimitHint(form.sustainability)}
+              error={fieldErrors.sustainability}
+            >
+              <Textarea
+                id="innovation-sustainability"
+                value={form.sustainability}
+                disabled={!editable}
+                placeholder="Explain how the work can continue financially, operationally, and responsibly."
+                onChange={(e) => set("sustainability", e.target.value)}
+              />
+            </Field>
+            <Field
+              label="Support requested"
+              hint={wordLimitHint(form.supportNeeded)}
+              error={fieldErrors.supportNeeded}
+            >
+              <Textarea
+                id="innovation-supportNeeded"
+                value={form.supportNeeded}
+                disabled={!editable}
+                placeholder="State the expertise, collaboration, equipment, testing, or funding support needed."
+                onChange={(e) => set("supportNeeded", e.target.value)}
+              />
+            </Field>
+          </FormGrid>
+          {editable && (
+            <Declarations
+              $invalid={Boolean(
+                fieldErrors.ownershipDeclared || fieldErrors.accuracyDeclared,
+              )}
+            >
+              <label>
+                <input
+                  id="innovation-ownershipDeclared"
+                  type="checkbox"
+                  aria-invalid={Boolean(fieldErrors.ownershipDeclared)}
+                  checked={form.ownershipDeclared}
+                  onChange={(e) => set("ownershipDeclared", e.target.checked)}
+                />{" "}
+                I own or am authorized to submit this innovation.
+              </label>
+              {fieldErrors.ownershipDeclared && (
+                <InlineError role="alert">
+                  {fieldErrors.ownershipDeclared}
+                </InlineError>
+              )}
+              <label>
+                <input
+                  id="innovation-accuracyDeclared"
+                  type="checkbox"
+                  aria-invalid={Boolean(fieldErrors.accuracyDeclared)}
+                  checked={form.accuracyDeclared}
+                  onChange={(e) => set("accuracyDeclared", e.target.checked)}
+                />{" "}
+                The information is accurate to the best of my knowledge.
+              </label>
+              {fieldErrors.accuracyDeclared && (
+                <InlineError role="alert">
+                  {fieldErrors.accuracyDeclared}
+                </InlineError>
+              )}
+            </Declarations>
+          )}
+          {editable && (
+            <Actions>
+              <Button disabled={busy} onClick={save}>
+                <Save /> {busy ? "Saving..." : "Save draft"}
+              </Button>
+              {id && (
+                <Button $variant="secondary" disabled={busy} onClick={submit}>
+                  Submit for review
+                </Button>
+              )}
+            </Actions>
+          )}
+        </PanelBody>
+      </Panel>
+      <Panel id="supporting-materials">
+        <PanelHeader>
+          <div>
+            <h2>Supporting materials (optional)</h2>
+            <p>
+              Upload documents or pictures. Add demonstrations and all videos as
+              links.
+            </p>
+          </div>
+        </PanelHeader>
+        <PanelBody>
+          <MaterialGroup>
+            <h3>Documents and pictures</h3>
+            <p>
+              Accepted: PDF, DOCX, XLSX, JPG, PNG, or WEBP. You may select
+              several files.
+            </p>
+            {!id && (
+              <AttachmentNotice>
+                <FileText />
+                <span>
+                  <strong>
+                    Save the innovation draft before uploading files.
+                  </strong>
+                  <small>
+                    Your form entries are already preserved locally.
+                  </small>
+                </span>
+                <Button onClick={save} disabled={busy}>
+                  Save draft to upload
+                </Button>
+              </AttachmentNotice>
+            )}
+            {editable && (
+              <UploadRow>
+                <Field
+                  label="Choose files"
+                  hint={
+                    id
+                      ? "Select one or more documents or pictures."
+                      : "Available after the database draft is created."
+                  }
+                  error={attachmentError}
+                >
+                  <Input
+                    key={fileInputKey}
+                    id="support-files"
+                    type="file"
+                    multiple
+                    disabled={!id || busy}
+                    accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png,.webp"
+                    onChange={(e) => {
+                      setFiles(Array.from(e.target.files ?? []));
+                      setAttachmentError("");
+                    }}
+                  />
+                </Field>
+                <Field label="Who can view these files">
+                  <Select
+                    value={visibility}
+                    disabled={!id || busy}
+                    onChange={(e) => setVisibility(e.target.value)}
+                  >
+                    <option value="REVIEW_TEAM">Review team</option>
+                    <option value="ADMIN_ONLY">
+                      System Administrator only
+                    </option>
+                    <option value="PUBLIC">Public after publication</option>
+                  </Select>
+                </Field>
+                <Button
+                  disabled={!id || !files.length || busy}
+                  onClick={upload}
+                >
+                  <UploadCloud />
+                  {busy
+                    ? "Uploading..."
+                    : files.length
+                      ? `Upload ${files.length} file${files.length === 1 ? "" : "s"}`
+                      : "Upload files"}
+                </Button>
+              </UploadRow>
+            )}
+            {record?.evidence.length ? (
+              <FileList>
+                {record.evidence.map((item) => (
+                  <div key={item.id}>
+                    <FileText />
+                    <span>
+                      <strong>{item.name}</strong>
+                      <small>
+                        {item.visibility} ·{" "}
+                        {Math.ceil(Number(item.sizeBytes) / 1024)} KB
+                      </small>
+                    </span>
+                    <a
+                      href={`/api/v1/innovations/${id}/evidence/${item.id}/download`}
+                    >
+                      Download
+                    </a>
+                  </div>
+                ))}
+              </FileList>
+            ) : (
+              id && (
+                <EmptyState
+                  title="No documents or pictures uploaded"
+                  copy="Supporting files are optional and do not affect draft completion."
+                />
+              )
+            )}
+          </MaterialGroup>
+          <MaterialGroup>
+            <h3>Links and videos</h3>
+            <p>
+              Paste a link for a hosted document, website, repository,
+              demonstration, or video. Video files cannot be uploaded directly.
+            </p>
+            {editable && (
+              <LinkForm>
+                <Field label="Link title" error={linkErrors.linkTitle}>
+                  <Input
+                    id="support-linkTitle"
+                    value={linkTitle}
+                    placeholder="Example: Prototype demonstration video"
+                    onChange={(e) => {
+                      setLinkTitle(e.target.value);
+                      setLinkErrors((old) => ({ ...old, linkTitle: "" }));
+                    }}
+                  />
+                </Field>
+                <Field label="Link URL" error={linkErrors.linkUrl}>
+                  <Input
+                    id="support-linkUrl"
+                    type="url"
+                    value={linkUrl}
+                    placeholder="https://example.com/demo"
+                    onChange={(e) => {
+                      setLinkUrl(e.target.value);
+                      setLinkErrors((old) => ({ ...old, linkUrl: "" }));
+                    }}
+                  />
+                </Field>
+                <Button $variant="secondary" disabled={busy} onClick={addLink}>
+                  <Link2 />
+                  Add link
+                </Button>
+              </LinkForm>
+            )}
+            {form.supportingLinks.length ? (
+              <FileList>
+                {form.supportingLinks.map((item, index) => (
+                  <div key={`${item.url}-${index}`}>
+                    <Link2 />
+                    <span>
+                      <strong>{item.title}</strong>
+                      <small>{item.url}</small>
+                    </span>
+                    {editable ? (
+                      <button
+                        aria-label={`Remove ${item.title}`}
+                        onClick={() =>
+                          set(
+                            "supportingLinks",
+                            form.supportingLinks.filter(
+                              (_, position) => position !== index,
+                            ),
+                          )
+                        }
+                      >
+                        <Trash2 />
+                      </button>
+                    ) : (
+                      <a href={item.url} target="_blank" rel="noreferrer">
+                        Open
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </FileList>
+            ) : (
+              <EmptyState
+                title="No supporting links"
+                copy="Links are optional and do not affect completion."
+              />
+            )}
+          </MaterialGroup>
+        </PanelBody>
+      </Panel>
+    </>
+  );
+}
 
-const friendlyRole=(role:Role)=>({SYSTEM_ADMINISTRATOR:'System Administrator',INNOVATOR:'Innovator',EXPERT:'Expert',INVESTOR_PARTNER:'Investor / Partner',PUBLIC_USER:'Public User'}[role]);
-const Shell=styled.div`min-height:100dvh;display:grid;grid-template-columns:258px 1fr;background:${palette.paper}@media(max-width:960px){grid-template-columns:1fr}`;
-const SkipLink=styled.a`position:fixed;left:16px;top:-60px;z-index:100;background:white;padding:10px;border-radius:8px;&:focus{top:12px}`;
-const Sidebar=styled.aside<{$open:boolean}>`position:sticky;top:0;height:100dvh;background:${palette.ink};color:white;padding:18px 14px;display:flex;flex-direction:column;z-index:40;overflow-y:auto;@media(max-width:960px){position:fixed;left:${({$open})=>$open?'0':'-280px'};width:258px;transition:left .2s ease}`;
-const SidebarTop=styled.div`display:flex;align-items:center;justify-content:space-between;padding:0 6px 19px;border-bottom:1px solid #ffffff18;a span{color:white}button{display:none;background:transparent;border:0;color:white;@media(max-width:960px){display:block}}`;
-const RoleChip=styled.div`display:grid;grid-template-columns:38px 1fr 10px;gap:10px;align-items:center;padding:16px 7px;>span{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:${palette.lime};color:${palette.greenDark};font-weight:800}div{display:flex;flex-direction:column;min-width:0}b{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}small{color:#adc2bd;font-size:10px}`;
-const StatusDot=styled.i`width:8px;height:8px;border-radius:50%;background:#47cd89`;
-const SidebarNav=styled.nav`display:flex;flex-direction:column;gap:3px;margin-top:6px;a{min-height:42px;padding:0 10px;display:grid;grid-template-columns:22px 1fr auto;align-items:center;gap:9px;border-radius:8px;color:#bcd0cb;font-size:12px;font-weight:600;transition:.15s}svg{width:17px}a:hover,a.active{background:#ffffff10;color:white}a.active:before{content:'';position:absolute;left:0;height:22px;width:3px;border-radius:0 3px 3px 0;background:${palette.lime}}a{position:relative}a b{background:${palette.lime};color:${palette.greenDark};min-width:20px;height:20px;border-radius:999px;display:grid;place-items:center;font-size:10px}`;
-const SidebarBottom=styled.div`margin-top:auto;padding-top:12px;border-top:1px solid #ffffff18;display:flex;flex-direction:column;a,button{display:flex;align-items:center;gap:9px;color:#bcd0cb;padding:9px;font-size:11px;background:transparent;border:0;text-align:left;cursor:pointer}svg{width:16px}`;
-const Workspace=styled.div`min-width:0`;
-const Topbar=styled.header`height:70px;background:white;border-bottom:1px solid ${palette.line};display:flex;align-items:center;justify-content:space-between;gap:18px;padding:0 26px;position:sticky;top:0;z-index:20;>button{display:none;border:0;background:transparent;@media(max-width:960px){display:block}}@media(max-width:600px){padding:0 15px}`;
-const SearchMini=styled.div`position:relative;max-width:360px;flex:1;svg{position:absolute;left:12px;top:12px;color:${palette.muted}}input{width:100%;height:40px;border:1px solid ${palette.line};border-radius:9px;padding:0 12px 0 38px;background:${palette.paper}}@media(max-width:600px){display:none}`;
-const TopActions=styled.div`display:flex;align-items:center;gap:12px;label{display:flex;align-items:center;gap:8px;font-size:11px;color:${palette.muted}}select{width:170px;min-height:38px}a{position:relative;color:${palette.muted};padding:10px}a i{position:absolute;width:7px;height:7px;background:${palette.danger};border-radius:50%;right:7px;top:7px}@media(max-width:620px){label{display:none}}`;
-const Avatar=styled.span`width:36px;height:36px;border-radius:10px;background:${palette.green};color:white;display:grid;place-items:center;font-size:11px;font-weight:800`;
-const Content=styled.main`padding:28px clamp(16px,3vw,36px) 70px;max-width:1500px;width:100%;margin:auto`;
-const Scrim=styled.div<{$open:boolean}>`display:none;@media(max-width:960px){display:${({$open})=>$open?'block':'none'};position:fixed;inset:0;background:#071e1b99;z-index:30}`;
-const Alert=styled.div`display:flex;align-items:center;gap:13px;background:${palette.warningSoft};border:1px solid #fedf89;color:${palette.warning};padding:13px 15px;border-radius:11px;margin-bottom:18px;>svg{flex:none}div{display:flex;flex-direction:column;flex:1}span{font-size:12px;color:#8a4b16}@media(max-width:600px){align-items:flex-start;flex-wrap:wrap}`;
-const SafetyNotice=styled(Alert)`background:${palette.infoSoft};border-color:#b2ddff;color:${palette.info};p{margin:0;font-size:12px}`;
-const DashboardGrid=styled.div`display:grid;grid-template-columns:1.45fr .75fr;gap:18px;margin-bottom:18px;@media(max-width:800px){grid-template-columns:1fr}`;
-const PortfolioRow=styled.div`display:grid;grid-template-columns:42px 1fr auto;gap:12px;align-items:center;padding:14px 18px;border-bottom:1px solid ${palette.line};>div:nth-of-type(2){min-width:0;display:grid;grid-template-columns:1fr 110px;gap:2px 12px}a{font-size:13px;font-weight:700}span{font-size:11px;color:${palette.muted}}div>div{grid-column:2;grid-row:1/3;align-self:center}@media(max-width:560px){grid-template-columns:35px 1fr;>span{grid-column:2}>div:nth-of-type(2){grid-template-columns:1fr}div>div{grid-column:1;grid-row:auto}}`;
-const Tone=styled.span<{$tone:string}>`display:block;width:100%;height:100%;min-height:42px;border-radius:9px;background:${({$tone})=>({mint:'#b9ddbb',amber:'#f2d493',blue:'#bbd6de',sage:'#cbdca8',lavender:'#d9d0e8',aqua:'#b9e1dc'}[$tone]||'#cfe0d4')}`;
-const QuickList=styled.div`padding:12px;display:flex;flex-direction:column;gap:9px`;
-const DonutWrap=styled.div`width:180px;height:180px;position:relative;margin:10px auto;display:grid;place-items:center;>div{position:absolute;display:flex;flex-direction:column;align-items:center}b{font-family:Fraunces,serif;font-size:36px}span{font-size:11px;color:${palette.muted}}`;
-const Donut=styled.div`width:160px;height:160px;border-radius:50%;background:conic-gradient(${palette.green} 0 50%,${palette.lime} 50% 75%,#b9d0d8 75%);mask:radial-gradient(circle,transparent 54%,#000 55%)`;
-const Legend=styled.div`display:flex;justify-content:center;gap:14px;flex-wrap:wrap;font-size:10px;color:${palette.muted};span{display:flex;align-items:center;gap:4px}i{width:7px;height:7px;background:${palette.green};border-radius:50%}span:nth-of-type(2)i{background:${palette.lime}}span:nth-of-type(3)i{background:#b9d0d8}`;
-const WorkflowRows=styled.div`padding:15px 20px;display:flex;flex-direction:column;gap:14px;>div{display:grid;grid-template-columns:110px 1fr 40px;align-items:center;gap:12px;font-size:12px}i{height:8px;background:#edf0ee;border-radius:999px;overflow:hidden}i b{display:block;height:100%;background:${palette.green};border-radius:inherit}strong{text-align:right}`;
-const AuditItem=styled.div`display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid ${palette.line};svg{color:${palette.green}}div{display:flex;flex-direction:column}b{font-size:12px}span{font-size:10px;color:${palette.muted}}`;
-const CardGrid=styled.div`display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;@media(max-width:950px){grid-template-columns:1fr 1fr}@media(max-width:600px){grid-template-columns:1fr}`;
-const InnovationTile=styled(Panel)`overflow:hidden;>span{height:95px;border-radius:0}>div{padding:16px}h2{font-family:Fraunces,serif;font-size:21px;line-height:1.15;margin:8px 0}p{font-size:12px;color:${palette.muted};min-height:55px}>div>span:not(:first-of-type){display:block;font-size:10px;color:${palette.muted};margin:14px 0 5px}`;
-const OpportunityTile=styled(InnovationTile)`footer{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:15px}footer span{font-size:10px;color:${palette.muted}}`;
-const ActionRow=styled.div`display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap;margin-top:18px`;
-const TimelinePanel=styled(Panel)`>div{display:grid;grid-template-columns:27px 1fr auto;gap:12px;align-items:center;padding:16px 20px;border-bottom:1px solid ${palette.line};&:last-of-type{border:0}svg{color:${palette.green}}h3{margin:0;font-size:13px}p{margin:1px 0 0;color:${palette.muted};font-size:11px}`;
-const FormLayout=styled.div`display:grid;grid-template-columns:180px 1fr 230px;gap:18px;align-items:start;@media(max-width:1050px){grid-template-columns:160px 1fr}@media(max-width:720px){grid-template-columns:1fr}`;
-const StepNav=styled.nav`display:flex;flex-direction:column;gap:3px;button{min-height:43px;border:0;background:transparent;border-radius:8px;display:grid;grid-template-columns:28px 1fr 14px;align-items:center;text-align:left;color:${palette.muted};font-size:11px;font-weight:700}button>span{width:25px;height:25px;border-radius:50%;border:1px solid ${palette.line};display:grid;place-items:center}button.active{background:${palette.soft};color:${palette.green}}@media(max-width:720px){flex-direction:row;overflow-x:auto;button{min-width:110px}}`;
-const FormSection=styled.div`display:flex;flex-direction:column;gap:18px;padding-top:24px`;
-const FormFooter=styled.div`display:flex;justify-content:space-between;margin-top:24px;padding-top:18px;border-top:1px solid ${palette.line}`;
-const SideHelp=styled.aside`display:flex;flex-direction:column;gap:12px;@media(max-width:1050px){display:none}`;
-const Autosave=styled.span`display:flex;align-items:center;gap:6px;color:${palette.success};font-size:12px;font-weight:700`;
-const UploadBox=styled.div`padding:38px 20px;border:1px dashed #a8c6af;border-radius:12px;text-align:center;background:#fbfdfb;color:${palette.muted};svg{margin:auto;color:${palette.green}}h3{color:${palette.ink};margin:10px 0 2px}p{margin:0 0 15px;font-size:12px}`;
-const VisibilityList=styled.div`display:flex;flex-direction:column;>div,label{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 0;border-bottom:1px solid ${palette.line}}>div>span,label>span{display:flex;flex-direction:column}small{color:${palette.muted};font-size:10px}select{max-width:170px}`;
-const Declaration=styled.div`display:flex;flex-direction:column;gap:13px;>svg{color:${palette.green}}h3{margin:0}label{display:flex;align-items:flex-start;gap:9px;font-size:13px}input{margin-top:4px}`;
-const NoticeText=styled.div`padding:12px 14px;background:${palette.infoSoft};border:1px solid #b2ddff;border-radius:9px;color:#175cd3;font-size:11px;line-height:1.55`;
-const Checklist=styled.div`display:flex;flex-direction:column;gap:10px;margin-top:14px;span{display:flex;align-items:center;gap:7px;color:${palette.muted};font-size:11px}svg,i{width:15px;height:15px;border:1px solid ${palette.line};border-radius:50%}.done{color:${palette.success}}.done svg{border:0}`;
-const Tabs=styled.nav`display:flex;gap:5px;border-bottom:1px solid ${palette.line};margin-bottom:18px;overflow-x:auto;button{min-height:42px;border:0;border-bottom:2px solid transparent;background:transparent;color:${palette.muted};font-size:11px;font-weight:700;white-space:nowrap}button:first-of-type{color:${palette.green};border-color:${palette.green}}`;
-const SnapshotGrid=styled.div`display:grid;grid-template-columns:1fr 1fr;gap:18px;div{display:flex;flex-direction:column}span{color:${palette.muted};font-size:10px;text-transform:uppercase;font-weight:700}b{font-size:13px;margin-top:2px}`;
-const Completion=styled.div`strong{font-family:Fraunces,serif;font-size:50px}span{display:block;color:${palette.muted};font-size:11px;margin-top:8px}`;
-const ReviewLayout=styled.div`display:grid;grid-template-columns:1fr 250px;gap:18px;align-items:start;>div{display:flex;flex-direction:column;gap:18px}aside{position:sticky;top:92px;display:flex;flex-direction:column;gap:12px}@media(max-width:850px){grid-template-columns:1fr;aside{position:static}}`;
-const ChecklistGrid=styled.div`display:grid;grid-template-columns:1fr 1fr;gap:10px;label{display:flex;align-items:flex-start;gap:9px;padding:12px;border:1px solid ${palette.line};border-radius:9px}span{display:flex;flex-direction:column}b{font-size:11px}small{font-size:10px;color:${palette.muted}}@media(max-width:600px){grid-template-columns:1fr}`;
-const ScoreList=styled.div`display:flex;flex-direction:column;>div{display:grid;grid-template-columns:180px 1fr 40px;gap:11px;align-items:center;padding:15px 0;border-bottom:1px solid ${palette.line}}>div>span{display:flex;flex-direction:column}b{font-size:12px}small{font-size:10px;color:${palette.muted}}textarea{grid-column:1/-1;min-height:70px}input[type=range]{accent-color:${palette.green}}@media(max-width:600px){>div{grid-template-columns:1fr 50px}input[type=range]{grid-column:1}textarea{grid-column:1/-1}}`;
-const ScoreCard=styled(Panel)`padding:20px;display:flex;flex-direction:column;align-items:center;text-align:center;strong{font-family:Fraunces,serif;font-size:72px;line-height:1;color:${palette.green};margin-top:8px}>span{color:${palette.muted};font-size:11px;margin-bottom:12px}>div{width:100%;margin-top:14px}`;
-const SecurityList=styled.div`display:flex;flex-direction:column;>div{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:14px 0;border-bottom:1px solid ${palette.line}}svg{color:${palette.green}}span{display:flex;flex-direction:column}b{font-size:12px}small{color:${palette.muted};font-size:10px}`;
-const NotificationRow=styled.div<{$unread:boolean}>`display:grid;grid-template-columns:38px 1fr 8px;gap:12px;padding:17px 20px;border-bottom:1px solid ${palette.line};background:${({$unread})=>$unread?'#fbfefc':'white'};>span{width:38px;height:38px;border-radius:10px;background:${palette.soft};display:grid;place-items:center;color:${palette.green}}div{display:flex;flex-direction:column}b{font-size:13px}p{font-size:12px;color:${palette.muted};margin:2px 0}small{font-size:10px;color:${palette.muted}}i{width:7px;height:7px;background:${palette.green};border-radius:50%;align-self:center}`;
-const MetaLine=styled.div`display:flex;justify-content:space-between;color:${palette.muted};font-size:11px;margin:15px 0`;
-const DecisionRow=styled.div`display:grid;grid-template-columns:50px 1fr auto;gap:14px;align-items:center;padding:17px 20px;border-bottom:1px solid ${palette.line};>span{height:50px}h3{margin:5px 0 0;font-size:14px}div>span{font-size:10px;color:${palette.muted}}div:last-of-type{display:flex;gap:8px}@media(max-width:650px){grid-template-columns:40px 1fr;div:last-of-type{grid-column:2}}`;
-const PublicationGrid=styled.div`display:grid;grid-template-columns:.75fr 1.25fr;gap:18px;@media(max-width:820px){grid-template-columns:1fr}`;
-const PreviewCard=styled.div`border:1px solid ${palette.line};border-radius:12px;overflow:hidden;padding-bottom:17px;margin-bottom:14px;>span:first-of-type{height:170px;border-radius:0;margin-bottom:15px}>span,h2,p,small{margin-left:17px;margin-right:17px}h2{font-family:Fraunces,serif;font-size:28px;margin-top:9px;margin-bottom:5px}p,small{color:${palette.muted};font-size:12px}`;
-const TaxonomyGrid=styled.div`display:grid;grid-template-columns:1fr 1fr;gap:16px;@media(max-width:700px){grid-template-columns:1fr}`;
-const TagCloud=styled.div`display:flex;gap:8px;flex-wrap:wrap;span{padding:7px 9px;border-radius:7px;background:${palette.soft};color:${palette.green};font-size:11px;font-weight:700}`;
-const CriteriaList=styled.div`display:flex;flex-direction:column;>div{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid ${palette.line}}span{display:flex;flex-direction:column}b{font-size:13px}small{font-size:10px;color:${palette.muted}}strong{font-family:Fraunces,serif;font-size:25px;color:${palette.green}}`;
-const TotalLine=styled.div`display:flex;justify-content:space-between;padding:16px 0 0;font-weight:800`;
-const ReportGrid=styled.div`display:grid;grid-template-columns:repeat(3,1fr);gap:15px;h2{font-size:15px;margin:10px 0 3px}p{font-size:11px;color:${palette.muted};min-height:48px}small{display:block;color:${palette.green};font-weight:700;margin-bottom:13px}@media(max-width:800px){grid-template-columns:1fr 1fr}@media(max-width:520px){grid-template-columns:1fr}`;
-const ReportIcon=styled.div`width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:${palette.soft};color:${palette.green}`;
-const FilterRow=styled.div`display:grid;grid-template-columns:1fr 160px 160px auto;gap:9px;margin-bottom:15px;@media(max-width:700px){grid-template-columns:1fr 1fr}@media(max-width:470px){grid-template-columns:1fr}`;
-const SettingsGrid=styled.div`display:grid;grid-template-columns:1fr 1fr;gap:16px;@media(max-width:700px){grid-template-columns:1fr}`;
-const Setting=styled.div`display:flex;justify-content:space-between;align-items:center;gap:15px;padding:13px 0;border-bottom:1px solid ${palette.line};span{display:flex;flex-direction:column}b{font-size:12px}small{font-size:10px;color:${palette.muted}}input[type=checkbox]{width:38px;height:20px;accent-color:${palette.green}}`;
+function ProgressPage() {
+  const { data, request, refreshWorkspace, notify } = usePlatform();
+  const records = data?.innovations ?? [];
+  const [innovationId, setInnovationId] = useState(records[0]?.id ?? "");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [status, setStatus] = useState("IN_PROGRESS");
+  const [targetDate, setTargetDate] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!innovationId && records[0]) setInnovationId(records[0].id);
+  }, [records.length]);
+  const add = async () => {
+    setError("");
+    try {
+      await request(`/api/v1/innovations/${innovationId}/milestones`, {
+        method: "POST",
+        body: JSON.stringify({
+          title,
+          description,
+          status,
+          targetDate: targetDate || undefined,
+          visibility: "REVIEW_TEAM",
+        }),
+      });
+      await refreshWorkspace();
+      setTitle("");
+      setDescription("");
+      notify("Project progress saved.");
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+  return (
+    <>
+      <PageHeader
+        eyebrow="Project progress"
+        title="Milestones and updates"
+        description="Record simple progress updates for each innovation."
+      />
+      {error && <ErrorBox>{error}</ErrorBox>}
+      {records.length ? (
+        <>
+          <Panel>
+            <PanelHeader>
+              <h2>Add progress update</h2>
+            </PanelHeader>
+            <PanelBody>
+              <FormGrid>
+                <Field label="Innovation">
+                  <Select
+                    value={innovationId}
+                    onChange={(e) => setInnovationId(e.target.value)}
+                  >
+                    {records.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.title}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="Status">
+                  <Select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                  >
+                    <option value="PLANNED">Planned</option>
+                    <option value="IN_PROGRESS">In progress</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="CANCELLED">Cancelled</option>
+                  </Select>
+                </Field>
+                <Field label="Update title">
+                  <Input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+                </Field>
+                <Field label="Target date">
+                  <Input
+                    type="date"
+                    value={targetDate}
+                    onChange={(e) => setTargetDate(e.target.value)}
+                  />
+                </Field>
+              </FormGrid>
+              <Field label="Description">
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </Field>
+              <Actions>
+                <Button disabled={!title.trim()} onClick={add}>
+                  <Plus />
+                  Add update
+                </Button>
+              </Actions>
+            </PanelBody>
+          </Panel>
+          <CardGrid>
+            {records
+              .flatMap((record) =>
+                record.milestones.map((item) => ({
+                  ...item,
+                  innovation: record.title,
+                })),
+              )
+              .map((item, index) => (
+                <Panel key={item.id ?? index}>
+                  <PanelBody>
+                    <StatusBadge status={item.status} />
+                    <h2>{item.title}</h2>
+                    <p>{item.description || "No description provided."}</p>
+                    <small>
+                      {item.innovation}
+                      {item.date ? ` · ${formatDate(item.date)}` : ""}
+                    </small>
+                  </PanelBody>
+                </Panel>
+              ))}
+          </CardGrid>
+        </>
+      ) : (
+        <EmptyState
+          title="Create an innovation first"
+          copy="Progress updates are connected to an innovation record."
+          action={
+            <ButtonLink to="/innovator/innovations/new">
+              Create innovation
+            </ButtonLink>
+          }
+        />
+      )}
+    </>
+  );
+}
+
+function RevisionPage() {
+  const { data, request, refreshWorkspace, notify } = usePlatform();
+  const revisions = data?.revisions ?? [];
+  const [responses, setResponses] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
+  const respond = async (item: (typeof revisions)[number]) => {
+    if (!item.innovationId) return;
+    setError("");
+    try {
+      await request(
+        `/api/v1/innovations/${item.innovationId}/revisions/${item.id}/respond`,
+        {
+          method: "POST",
+          body: JSON.stringify({ response: responses[item.id] || "" }),
+        },
+      );
+      await refreshWorkspace();
+      notify("Response sent to the review team.");
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+  return (
+    <>
+      <PageHeader
+        eyebrow="Expert feedback"
+        title="Revision requests"
+        description="Respond to comments connected to a submitted innovation version."
+      />
+      {error && <ErrorBox>{error}</ErrorBox>}
+      {revisions.length ? (
+        <CardGrid>
+          {revisions.map((item) => (
+            <Panel key={item.id}>
+              <PanelBody>
+                <StatusBadge status={item.status} />
+                <h2>{item.innovation}</h2>
+                <Eyebrow>{item.field}</Eyebrow>
+                <p>{item.instruction}</p>
+                {item.status === "OPEN" && (
+                  <>
+                    <Field label="Your response">
+                      <Textarea
+                        value={responses[item.id] ?? ""}
+                        onChange={(e) =>
+                          setResponses((old) => ({
+                            ...old,
+                            [item.id]: e.target.value,
+                          }))
+                        }
+                      />
+                    </Field>
+                    <Button
+                      disabled={!(responses[item.id] ?? "").trim()}
+                      onClick={() => respond(item)}
+                    >
+                      Send response
+                    </Button>
+                  </>
+                )}
+              </PanelBody>
+            </Panel>
+          ))}
+        </CardGrid>
+      ) : (
+        <EmptyState
+          title="No revision requests"
+          copy="Expert comments will appear here after the review phase begins."
+        />
+      )}
+    </>
+  );
+}
+
+function AdminDashboardPage() {
+  const { request } = usePlatform();
+  const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    request<AdminDashboard>("/api/v1/admin/dashboard")
+      .then(setDashboard)
+      .catch((cause) => setError(messageOf(cause)));
+  }, []);
+  if (error) return <ErrorBox>{error}</ErrorBox>;
+  if (!dashboard) return <LoadingPanel />;
+  return (
+    <>
+      <PageHeader
+        eyebrow="System administration"
+        title="Platform overview"
+        description="Live counts from PostgreSQL for the current prototype scope."
+      />
+      <StatGrid>
+        <StatCard
+          label="Registered users"
+          value={dashboard.counts.users}
+          detail="All four actor types"
+          icon={<Users />}
+        />
+        <StatCard
+          label="Pending approvals"
+          value={dashboard.counts.pendingVerifications}
+          detail="Expert and Partner accounts"
+          icon={<UserCheck />}
+        />
+        <StatCard
+          label="Innovations"
+          value={dashboard.counts.innovations}
+          detail="All workflow states"
+          icon={<FolderKanban />}
+        />
+        <StatCard
+          label="Published"
+          value={dashboard.counts.published}
+          detail="Visible in public registry"
+          icon={<CheckCircle2 />}
+        />
+      </StatGrid>
+    </>
+  );
+}
+
+function UsersPage({ selectedId }: { selectedId?: string }) {
+  const { request, notify } = usePlatform();
+  const navigate = useNavigate();
+  const [users, setUsers] = useState<Account[]>([]);
+  const [selected, setSelected] = useState<Account | null>(null);
+  const [editing, setEditing] = useState<Account | "new" | null>(null);
+  const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [pendingDelete, setPendingDelete] = useState<Account | null>(null);
+  const load = () =>
+    request<Account[]>("/api/v1/admin/users")
+      .then((records) => {
+        setUsers(records);
+        setError("");
+      })
+      .catch((cause) => setError(messageOf(cause)));
+  useEffect(() => {
+    void load();
+  }, []);
+  useEffect(() => {
+    if (!selectedId) {
+      setSelected(null);
+      return;
+    }
+    request<Account>(`/api/v1/admin/users/${selectedId}`)
+      .then(setSelected)
+      .catch((cause) => setError(messageOf(cause)));
+  }, [selectedId]);
+  const deleteUser = async () => {
+    if (!pendingDelete) return;
+    try {
+      await request(`/api/v1/admin/users/${pendingDelete.id}`, {
+        method: "DELETE",
+      });
+      notify("User account deleted and all active sessions revoked.");
+      setPendingDelete(null);
+      await load();
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+  const save = async (input: Record<string, unknown>) => {
+    try {
+      const creating = editing === "new";
+      const saved = await request<Account>(
+        creating
+          ? "/api/v1/admin/users"
+          : `/api/v1/admin/users/${editing && typeof editing !== "string" ? editing.id : ""}`,
+        {
+          method: creating ? "POST" : "PUT",
+          body: JSON.stringify(input),
+        },
+      );
+      notify(creating ? "User account created." : "User information updated.");
+      setEditing(null);
+      if (selectedId) setSelected(saved);
+      await load();
+    } catch (cause) {
+      setError(messageOf(cause));
+      throw cause;
+    }
+  };
+  const filteredUsers = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return users.filter((user) => {
+      const matchesQuery =
+        !needle ||
+        `${user.name} ${user.email} ${user.organization} ${friendlyRole(user.role)}`
+          .toLowerCase()
+          .includes(needle);
+      return (
+        matchesQuery &&
+        (roleFilter === "ALL" || user.role === roleFilter) &&
+        (statusFilter === "ALL" || user.accountStatus === statusFilter)
+      );
+    });
+  }, [users, query, roleFilter, statusFilter]);
+  const exportUsers = () =>
+    downloadCsv(
+      "lidkep-users.csv",
+      [
+        "Name",
+        "Email",
+        "Role",
+        "Organization",
+        "Status",
+        "Joined",
+        "Last active",
+      ],
+      filteredUsers.map((user) => [
+        user.name,
+        user.email,
+        friendlyRole(user.role),
+        user.organization,
+        user.accountStatus,
+        user.createdAt ?? "",
+        user.lastLoginAt ?? "",
+      ]),
+    );
+  if (selectedId && !selected)
+    return error ? <ErrorBox>{error}</ErrorBox> : <LoadingPanel />;
+  if (selected) {
+    const details = [
+      ["Full name", selected.name],
+      ["Email", selected.email],
+      ["Role", friendlyRole(selected.role)],
+      ["Status", selected.accountStatus.replaceAll("_", " ")],
+      ["Organization", selected.organization],
+      ["Identification type", selected.identificationType],
+      ["Identification number", selected.identificationNumber],
+      ["Phone number", selected.phoneNumber],
+      ["Education", selected.educationLevel],
+      ["Occupation", selected.occupation],
+      ["Province", selected.province],
+      ["District", selected.district],
+      ["Sector", selected.administrativeSector],
+      ["Years of experience", String(selected.yearsOfExperience ?? 0)],
+      ["Created", selected.createdAt ? formatDate(selected.createdAt) : ""],
+    ];
+    return (
+      <>
+        <PageHeader
+          eyebrow="User management"
+          title={selected.name}
+          description="Complete account and profile information available to the System Administrator."
+          action={
+            <Actions>
+              <Button
+                $variant="secondary"
+                onClick={() => {
+                  setSelected(null);
+                  navigate("/admin/users");
+                }}
+              >
+                <ArrowLeft />
+                All users
+              </Button>
+              <Button onClick={() => setEditing(selected)}>Edit user</Button>
+            </Actions>
+          }
+        />
+        {error && <ErrorBox>{error}</ErrorBox>}
+        <Panel>
+          <PanelBody>
+            <StatusBadge status={selected.accountStatus} />
+            <DetailGrid>
+              {details.map(([label, value]) => (
+                <DetailItem key={label}>
+                  <small>{label}</small>
+                  <strong>{value || "Not provided"}</strong>
+                </DetailItem>
+              ))}
+            </DetailGrid>
+          </PanelBody>
+        </Panel>
+        {editing && (
+          <UserEditor
+            user={editing === "new" ? null : editing}
+            onCancel={() => setEditing(null)}
+            onSave={save}
+          />
+        )}
+        {pendingDelete && (
+          <ConfirmationDialog
+            title={`Delete ${pendingDelete.name}?`}
+            message="This disables the account, revokes its sessions, and removes it from active user lists."
+            confirmLabel="Yes"
+            danger
+            onCancel={() => setPendingDelete(null)}
+            onConfirm={deleteUser}
+          />
+        )}
+      </>
+    );
+  }
+  return (
+    <>
+      <ManagementPageHeader
+        icon={<Users />}
+        eyebrow="User management"
+        title="Users and account status"
+        description="View, create, edit, suspend, reactivate, disable, or delete accounts across every platform role."
+        action={
+          <Actions>
+            <Button $variant="secondary" onClick={exportUsers}>
+              <Download />
+              Export
+            </Button>
+            <Button onClick={() => setEditing("new")}>
+              <Plus />
+              New user
+            </Button>
+          </Actions>
+        }
+      />
+      {error && <ErrorBox>{error}</ErrorBox>}
+      <AdminDataPanel>
+        <DataToolbar>
+          <SearchControl>
+            <Search aria-hidden="true" />
+            <Input
+              aria-label="Search users"
+              placeholder="Search users by name, email, organization, or role"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </SearchControl>
+          <ToolbarFilters>
+            <Select
+              aria-label="Filter users by role"
+              value={roleFilter}
+              onChange={(event) => setRoleFilter(event.target.value)}
+            >
+              <option value="ALL">All roles</option>
+              <option value="SYSTEM_ADMINISTRATOR">System Administrator</option>
+              <option value="INNOVATOR">Innovator</option>
+              <option value="EXPERT">Expert</option>
+              <option value="INVESTOR_PARTNER">
+                Investor / Industry Partner
+              </option>
+            </Select>
+            <Select
+              aria-label="Filter users by status"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
+              <option value="ALL">All statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="PENDING_APPROVAL">Pending approval</option>
+              <option value="SUSPENDED">Suspended</option>
+              <option value="DISABLED">Disabled</option>
+            </Select>
+          </ToolbarFilters>
+        </DataToolbar>
+        <TableWrap>
+          <UserManagementTable>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Role</th>
+                <th>Organization</th>
+                <th>Status</th>
+                <th>Joined</th>
+                <th>Last active</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUsers.map((user) => (
+                <tr key={user.id}>
+                  <td>
+                    <IdentityCell>
+                      <RowAvatar>{initials(user.name)}</RowAvatar>
+                      <span>
+                        <strong>{user.name}</strong>
+                        <small>{user.email}</small>
+                      </span>
+                    </IdentityCell>
+                  </td>
+                  <td>{friendlyRole(user.role)}</td>
+                  <td>{user.organization || "—"}</td>
+                  <td>
+                    <StatusBadge status={user.accountStatus} />
+                  </td>
+                  <td>{user.createdAt ? formatDate(user.createdAt) : "—"}</td>
+                  <td>
+                    {user.lastLoginAt ? formatDate(user.lastLoginAt) : "Never"}
+                  </td>
+                  <td>
+                    <RowActions>
+                      <IconButtonLink
+                        to={`/admin/users/${user.id}`}
+                        aria-label={`View ${user.name}`}
+                        title="View user"
+                      >
+                        <Eye />
+                      </IconButtonLink>
+                      <IconButton
+                        type="button"
+                        $variant="secondary"
+                        aria-label={`Edit ${user.name}`}
+                        title="Edit user"
+                        onClick={() => setEditing(user)}
+                      >
+                        <Pencil />
+                      </IconButton>
+                    </RowActions>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </UserManagementTable>
+        </TableWrap>
+        {!filteredUsers.length && (
+          <EmptyState
+            title="No users match these filters"
+            copy="Try a broader search or reset the role and status filters."
+          />
+        )}
+        <TableFooter>
+          <span>
+            Showing {filteredUsers.length} of {users.length} users
+          </span>
+          <span>Page 1 of 1</span>
+        </TableFooter>
+      </AdminDataPanel>
+      {editing && (
+        <UserEditor
+          user={editing === "new" ? null : editing}
+          onCancel={() => setEditing(null)}
+          onSave={save}
+        />
+      )}
+    </>
+  );
+}
+
+function UserEditor({
+  user,
+  onCancel,
+  onSave,
+}: {
+  user: Account | null;
+  onCancel: () => void;
+  onSave: (input: Record<string, unknown>) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const input: Record<string, unknown> = {
+      email: String(form.get("email")),
+      displayName: String(form.get("displayName")),
+      role: String(form.get("role")),
+      status: String(form.get("status")),
+      organization: String(form.get("organization")),
+      identificationType: String(form.get("identificationType")),
+      identificationNumber: String(form.get("identificationNumber")),
+      phoneNumber: String(form.get("phoneNumber")),
+      educationLevel: String(form.get("educationLevel")),
+      province: String(form.get("province")),
+      district: String(form.get("district")),
+      administrativeSector: String(form.get("administrativeSector")),
+      occupation: String(form.get("occupation")),
+      yearsOfExperience: Number(form.get("yearsOfExperience") || 0),
+      preferredLanguage: String(form.get("preferredLanguage")),
+      publicProfile: form.get("publicProfile") === "on",
+    };
+    if (!user) {
+      input.password = String(form.get("password"));
+    }
+    setBusy(true);
+    try {
+      await onSave(input);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <ModalBackdrop role="presentation">
+      <UserEditorModal
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="user-editor-title"
+      >
+        <PanelHeader>
+          <div>
+            <h2 id="user-editor-title">
+              {user ? "Edit user information" : "Create user account"}
+            </h2>
+            <p>System Administrator managed account details.</p>
+          </div>
+          <button aria-label="Close" onClick={onCancel}>
+            <X />
+          </button>
+        </PanelHeader>
+        <PanelBody>
+          <AdminForm onSubmit={submit}>
+            <FormGrid>
+              <Field label="Full name">
+                <Input name="displayName" required defaultValue={user?.name} />
+              </Field>
+              <Field label="Email">
+                <Input
+                  name="email"
+                  type="email"
+                  required
+                  defaultValue={user?.email}
+                />
+              </Field>
+              <Field label="Role">
+                <Select name="role" defaultValue={user?.role ?? "INNOVATOR"}>
+                  <option value="SYSTEM_ADMINISTRATOR">
+                    System Administrator
+                  </option>
+                  <option value="INNOVATOR">Innovator</option>
+                  <option value="EXPERT">Expert</option>
+                  <option value="INVESTOR_PARTNER">
+                    Investor / Industry Partner
+                  </option>
+                </Select>
+              </Field>
+              <Field
+                label={user ? "Account status" : "Initial status"}
+                hint={
+                  user
+                    ? "Suspending or disabling the account revokes its active sessions."
+                    : "Choose the account status applied after creation."
+                }
+              >
+                <Select
+                  name="status"
+                  defaultValue={user?.accountStatus ?? "ACTIVE"}
+                >
+                  <option value="ACTIVE">Active</option>
+                  <option value="PENDING_APPROVAL">Pending approval</option>
+                  <option value="SUSPENDED">Suspended</option>
+                  <option value="DISABLED">Disabled</option>
+                </Select>
+              </Field>
+              {!user && (
+                <Field label="Temporary password">
+                  <Input
+                    name="password"
+                    type="password"
+                    minLength={12}
+                    required
+                  />
+                </Field>
+              )}
+              <Field label="Organization">
+                <Input name="organization" defaultValue={user?.organization} />
+              </Field>
+              <Field label="Identification type">
+                <Input
+                  name="identificationType"
+                  defaultValue={user?.identificationType}
+                />
+              </Field>
+              <Field label="Identification number">
+                <Input
+                  name="identificationNumber"
+                  defaultValue={user?.identificationNumber}
+                />
+              </Field>
+              <Field label="Phone number">
+                <Input name="phoneNumber" defaultValue={user?.phoneNumber} />
+              </Field>
+              <Field label="Education">
+                <Input
+                  name="educationLevel"
+                  defaultValue={user?.educationLevel}
+                />
+              </Field>
+              <Field label="Occupation">
+                <Input name="occupation" defaultValue={user?.occupation} />
+              </Field>
+              <Field label="Province">
+                <Input name="province" defaultValue={user?.province} />
+              </Field>
+              <Field label="District">
+                <Input name="district" defaultValue={user?.district} />
+              </Field>
+              <Field label="Administrative sector">
+                <Input
+                  name="administrativeSector"
+                  defaultValue={user?.administrativeSector}
+                />
+              </Field>
+              <Field label="Years of experience">
+                <Input
+                  name="yearsOfExperience"
+                  type="number"
+                  min="0"
+                  max="80"
+                  defaultValue={user?.yearsOfExperience ?? 0}
+                />
+              </Field>
+              <Field label="Preferred language">
+                <Select
+                  name="preferredLanguage"
+                  defaultValue={user?.preferredLanguage ?? "en"}
+                >
+                  <option value="en">English</option>
+                  <option value="rw">Kinyarwanda</option>
+                </Select>
+              </Field>
+            </FormGrid>
+            <CheckLabel>
+              <input
+                name="publicProfile"
+                type="checkbox"
+                defaultChecked={user?.publicProfile}
+              />
+              Show this profile publicly
+            </CheckLabel>
+            <Actions>
+              <Button type="button" $variant="secondary" onClick={onCancel}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={busy}>
+                {busy ? "Saving..." : "Save user"}
+              </Button>
+            </Actions>
+          </AdminForm>
+        </PanelBody>
+      </UserEditorModal>
+    </ModalBackdrop>
+  );
+}
+
+function VerificationsPage({ selectedId }: { selectedId?: string }) {
+  const { request, notify } = usePlatform();
+  const [items, setItems] = useState<Verification[]>([]);
+  const [selected, setSelected] = useState<Verification | null>(null);
+  const [error, setError] = useState("");
+  const load = () =>
+    request<Verification[]>("/api/v1/admin/verifications")
+      .then(setItems)
+      .catch((cause) => setError(messageOf(cause)));
+  useEffect(() => {
+    void load();
+  }, []);
+  useEffect(() => {
+    if (!selectedId) {
+      setSelected(null);
+      return;
+    }
+    request<Verification>(`/api/v1/admin/verifications/${selectedId}`)
+      .then(setSelected)
+      .catch((cause) => setError(messageOf(cause)));
+  }, [selectedId]);
+  const [pending, setPending] = useState<{
+    item: Verification;
+    decision: "APPROVE" | "REJECT";
+  } | null>(null);
+  const decide = async () => {
+    if (!pending) return;
+    try {
+      await request(`/api/v1/admin/verifications/${pending.item.id}/decision`, {
+        method: "POST",
+        body: JSON.stringify({ decision: pending.decision }),
+      });
+      notify(
+        `Account ${pending.decision === "APPROVE" ? "approved" : "rejected"}.`,
+      );
+      setPending(null);
+      await load();
+      if (selectedId) {
+        setSelected(
+          await request<Verification>(
+            `/api/v1/admin/verifications/${selectedId}`,
+          ),
+        );
+      }
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+  if (selectedId && !selected)
+    return error ? <ErrorBox>{error}</ErrorBox> : <LoadingPanel />;
+  if (selected) {
+    const details = [
+      ["Full name", selected.name],
+      ["Email", selected.email],
+      ["Requested role", friendlyRole(selected.role)],
+      ["Organization", selected.organization],
+      ["Identification type", selected.identificationType],
+      ["Identification number", selected.identificationNumber],
+      ["Phone number", selected.phoneNumber],
+      ["Education", selected.educationLevel],
+      ["Occupation", selected.occupation],
+      ["Province", selected.province],
+      ["District", selected.district],
+      ["Sector", selected.administrativeSector],
+      ["Years of experience", String(selected.yearsOfExperience ?? 0)],
+      [
+        "Submitted",
+        selected.submittedAt ? formatDate(selected.submittedAt) : "",
+      ],
+    ];
+    return (
+      <>
+        <PageHeader
+          eyebrow="Account approval review"
+          title={selected.name}
+          description="Review the complete user information below before making a decision."
+          action={
+            <ButtonLink to="/admin/verifications" $variant="secondary">
+              <ArrowLeft />
+              Approval queue
+            </ButtonLink>
+          }
+        />
+        {error && <ErrorBox>{error}</ErrorBox>}
+        <Panel>
+          <PanelBody>
+            <StatusBadge status={selected.status} />
+            <DetailGrid>
+              {details.map(([label, value]) => (
+                <DetailItem key={label}>
+                  <small>{label}</small>
+                  <strong>{value || "Not provided"}</strong>
+                </DetailItem>
+              ))}
+            </DetailGrid>
+            <SectionBlock>
+              <h3>Supporting evidence</h3>
+              {selected.evidenceFiles?.length ? (
+                <FileList>
+                  {selected.evidenceFiles.map((file) => (
+                    <div key={file.id}>
+                      <FileText />
+                      <span>
+                        <strong>{file.name}</strong>
+                        <small>{file.mimeType}</small>
+                      </span>
+                    </div>
+                  ))}
+                </FileList>
+              ) : (
+                <p>No evidence files were submitted.</p>
+              )}
+            </SectionBlock>
+            {selected.status === "PENDING_APPROVAL" && (
+              <Actions>
+                <Button
+                  $variant="danger"
+                  onClick={() =>
+                    setPending({ item: selected, decision: "REJECT" })
+                  }
+                >
+                  Reject
+                </Button>
+                <Button
+                  onClick={() =>
+                    setPending({ item: selected, decision: "APPROVE" })
+                  }
+                >
+                  <UserCheck />
+                  Approve
+                </Button>
+              </Actions>
+            )}
+          </PanelBody>
+        </Panel>
+        {pending && (
+          <ConfirmationDialog
+            title={`${pending.decision === "APPROVE" ? "Approve" : "Reject"} ${pending.item.name}?`}
+            message={`Are you sure you want to ${pending.decision.toLowerCase()} this account?`}
+            confirmLabel="Yes"
+            danger={pending.decision === "REJECT"}
+            onCancel={() => setPending(null)}
+            onConfirm={decide}
+          />
+        )}
+      </>
+    );
+  }
+  return (
+    <>
+      <PageHeader
+        eyebrow="Account approvals"
+        title="User account approval queue"
+        description="Every submitted Innovator, Expert, and Investor / Industry Partner profile requires a System Administrator decision before its role workspace is unlocked."
+      />
+      {error && <ErrorBox>{error}</ErrorBox>}
+      {items.length ? (
+        <CardGrid>
+          {items.map((item) => (
+            <Panel key={item.id}>
+              <PanelBody>
+                <StatusBadge status={item.status} />
+                <h2>{item.name}</h2>
+                <p>{item.organization || "No organization provided"}</p>
+                <small>
+                  {friendlyRole(item.role)} · {item.email}
+                </small>
+                <Actions>
+                  <ButtonLink
+                    to={`/admin/verifications/${item.id}`}
+                    $variant="secondary"
+                  >
+                    Review information
+                  </ButtonLink>
+                </Actions>
+                {item.decisionReason && (
+                  <DecisionReason>{item.decisionReason}</DecisionReason>
+                )}
+              </PanelBody>
+            </Panel>
+          ))}
+        </CardGrid>
+      ) : (
+        <EmptyState
+          title="No account approvals"
+          copy="New role registrations will appear here."
+        />
+      )}
+      {pending && (
+        <ConfirmationDialog
+          title={`${pending.decision === "APPROVE" ? "Approve" : "Reject"} ${pending.item.name}?`}
+          message={`Are you sure you want to ${pending.decision.toLowerCase()} this account?`}
+          confirmLabel="Yes"
+          danger={pending.decision === "REJECT"}
+          onCancel={() => setPending(null)}
+          onConfirm={decide}
+        />
+      )}
+    </>
+  );
+}
+
+const expertAssignableStatuses = new Set([
+  "SUBMITTED",
+  "UNDER_REVIEW",
+  "APPROVED",
+  "PUBLISHED",
+]);
+
+const canAssignExpert = (innovation: Innovation) =>
+  !innovation.assignment &&
+  Boolean(innovation.submittedAt) &&
+  expertAssignableStatuses.has(innovation.status);
+
+function AdminInnovationsPage({ selectedId }: { selectedId?: string }) {
+  const { data, request, notify } = usePlatform();
+  const [items, setItems] = useState<Innovation[]>([]);
+  const [editing, setEditing] = useState<Innovation | "new" | null>(null);
+  const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [assignedFilter, setAssignedFilter] = useState("ALL");
+  const [assigning, setAssigning] = useState<Innovation | null>(null);
+  const [expertId, setExpertId] = useState("");
+  const [assignmentDueAt, setAssignmentDueAt] = useState("");
+  const [assignmentError, setAssignmentError] = useState("");
+  const [assignmentBusy, setAssignmentBusy] = useState(false);
+  const load = () =>
+    request<Innovation[]>("/api/v1/admin/innovations")
+      .then((records) => {
+        setItems(records);
+        setError("");
+      })
+      .catch((cause) => setError(messageOf(cause)));
+  useEffect(() => {
+    void load();
+  }, []);
+  const [pending, setPending] = useState<{
+    item: Innovation;
+    action: "status" | "delete";
+    status?: string;
+  } | null>(null);
+  const decide = async () => {
+    if (!pending) return;
+    try {
+      if (pending.action === "delete") {
+        await request(`/api/v1/admin/innovations/${pending.item.id}`, {
+          method: "DELETE",
+        });
+        notify("Innovation deleted.");
+      } else {
+        await request(`/api/v1/admin/innovations/${pending.item.id}/decision`, {
+          method: "POST",
+          body: JSON.stringify({ status: pending.status }),
+        });
+        notify("Innovation status updated and the Innovator was notified.");
+      }
+      setPending(null);
+      await load();
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+  const save = async (input: Record<string, unknown>) => {
+    try {
+      const creating = editing === "new";
+      await request(
+        creating
+          ? "/api/v1/admin/innovations"
+          : `/api/v1/innovations/${editing && typeof editing !== "string" ? editing.id : ""}`,
+        {
+          method: creating ? "POST" : "PATCH",
+          body: JSON.stringify(input),
+        },
+      );
+      notify(
+        creating
+          ? "Innovation draft created."
+          : "Innovation information updated.",
+      );
+      setEditing(null);
+      await load();
+    } catch (cause) {
+      setError(messageOf(cause));
+      throw cause;
+    }
+  };
+  const selected = items.find((item) => item.id === selectedId);
+  const approvedExperts = (data?.users ?? []).filter(
+    (user) => user.role === "EXPERT" && user.accountStatus === "ACTIVE",
+  );
+  const categories = useMemo(
+    () =>
+      Array.from(
+        new Set(items.map((item) => item.category).filter(Boolean)),
+      ).sort(),
+    [items],
+  );
+  const filteredItems = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return items.filter((item) => {
+      const matchesQuery =
+        !needle ||
+        `${item.title} ${item.owner} ${item.sector} ${item.category}`
+          .toLowerCase()
+          .includes(needle);
+      const matchesAssigned =
+        assignedFilter === "ALL" ||
+        (assignedFilter === "ASSIGNED"
+          ? Boolean(item.assignment)
+          : !item.assignment);
+      return (
+        matchesQuery &&
+        (statusFilter === "ALL" || item.status === statusFilter) &&
+        (categoryFilter === "ALL" || item.category === categoryFilter) &&
+        matchesAssigned
+      );
+    });
+  }, [items, query, statusFilter, categoryFilter, assignedFilter]);
+  const exportInnovations = () =>
+    downloadCsv(
+      "lidkep-innovations.csv",
+      [
+        "Innovation",
+        "Category",
+        "Owner",
+        "Assigned Expert",
+        "Completion",
+        "Status",
+        "Submitted",
+      ],
+      filteredItems.map((item) => [
+        item.title,
+        item.category,
+        item.owner,
+        item.assignment?.expert ?? "",
+        `${item.completion}%`,
+        item.status,
+        item.submittedAt ?? "",
+      ]),
+    );
+  const openAssignment = (innovation: Innovation) => {
+    if (!canAssignExpert(innovation)) return;
+    setExpertId("");
+    setAssignmentDueAt("");
+    setAssignmentError("");
+    setAssigning(innovation);
+  };
+  const closeAssignment = () => {
+    setExpertId("");
+    setAssignmentDueAt("");
+    setAssignmentError("");
+    setAssigning(null);
+  };
+  const assign = async () => {
+    if (!assigning || !expertId || !canAssignExpert(assigning)) return;
+    setAssignmentBusy(true);
+    setAssignmentError("");
+    try {
+      await request(`/api/v1/admin/innovations/${assigning.id}/assignments`, {
+        method: "POST",
+        body: JSON.stringify({ expertId, dueAt: assignmentDueAt || undefined }),
+      });
+      notify(
+        "Innovation assigned. The Expert received a new assignment notification.",
+      );
+      closeAssignment();
+      await load();
+    } catch (cause) {
+      setAssignmentError(messageOf(cause));
+    } finally {
+      setAssignmentBusy(false);
+    }
+  };
+  return (
+    <>
+      <ManagementPageHeader
+        icon={<FolderKanban />}
+        eyebrow="Innovation management"
+        title={selected ? selected.title : "All innovations"}
+        description="Review submitted records, control status, and publish only approved versions."
+        action={
+          selected ? (
+            <Actions>
+              <ButtonLink to="/admin/innovations" $variant="secondary">
+                <ArrowLeft />
+                All innovations
+              </ButtonLink>
+              <Button onClick={() => setEditing(selected)}>
+                Edit innovation
+              </Button>
+            </Actions>
+          ) : (
+            <Actions>
+              <Button $variant="secondary" onClick={exportInnovations}>
+                <Download />
+                Export
+              </Button>
+              <Button onClick={() => setEditing("new")}>
+                <Plus />
+                New innovation
+              </Button>
+            </Actions>
+          )
+        }
+      />
+      {error && <ErrorBox>{error}</ErrorBox>}
+      {selected && (
+        <Panel>
+          <PanelBody>
+            <StatusBadge status={selected.status} />
+            <DetailGrid>
+              {[
+                ["Owner", selected.owner],
+                ["Organization", selected.organization],
+                ["Sector", selected.sector],
+                ["Category", selected.category],
+                ["District", selected.district],
+                ["Maturity", selected.maturity],
+                ["Impact area", selected.impactArea],
+                ["Completion", `${selected.completion}%`],
+                ["Version", String(selected.version)],
+                [
+                  "Created",
+                  selected.createdAt ? formatDate(selected.createdAt) : "",
+                ],
+                [
+                  "Updated",
+                  selected.updatedAt ? formatDate(selected.updatedAt) : "",
+                ],
+              ].map(([label, value]) => (
+                <DetailItem key={label}>
+                  <small>{label}</small>
+                  <strong>{value || "Not provided"}</strong>
+                </DetailItem>
+              ))}
+            </DetailGrid>
+            <NarrativeGrid>
+              {[
+                ["Summary", selected.summary],
+                ["Problem or need", selected.problem],
+                ["Proposed solution", selected.solution],
+                ["Beneficiaries", selected.beneficiaries],
+                ["Expected impact", selected.impact],
+                ["What is new", selected.novelty],
+                ["Current evidence", selected.currentEvidence],
+                ["Implementation plan", selected.implementationPlan],
+                ["Scalability", selected.scalability],
+                ["Sustainability", selected.sustainability],
+                ["Support needed", selected.supportNeeded],
+              ].map(([label, value]) => (
+                <section key={label}>
+                  <h3>{label}</h3>
+                  <p>{value || "Not provided"}</p>
+                </section>
+              ))}
+            </NarrativeGrid>
+            <SectionBlock>
+              <h3>Evidence files</h3>
+              {selected.evidence.length ? (
+                <FileList>
+                  {selected.evidence.map((file) => (
+                    <div key={file.id}>
+                      <FileText />
+                      <span>
+                        <strong>{file.name}</strong>
+                        <small>{file.mimeType}</small>
+                      </span>
+                      <a
+                        href={`/api/v1/innovations/${selected.id}/evidence/${file.id}/download`}
+                      >
+                        Download
+                      </a>
+                    </div>
+                  ))}
+                </FileList>
+              ) : (
+                <p>No evidence files.</p>
+              )}
+            </SectionBlock>
+            {selected.assignment ? (
+              <AssignmentLock>
+                <LockKeyhole />
+                <span>
+                  <strong>Assigned to {selected.assignment.expert}</strong>
+                  <small>
+                    This one-time assignment is locked and cannot be changed.
+                  </small>
+                </span>
+                <StatusBadge status={selected.assignment.status} />
+              </AssignmentLock>
+            ) : canAssignExpert(selected) ? (
+              <SectionBlock>
+                <h3>Expert assignment</h3>
+                <p>
+                  Assign this innovation once. The selected Expert cannot be
+                  changed afterward.
+                </p>
+                <Button onClick={() => openAssignment(selected)}>
+                  <UserCheck />
+                  Assign Expert
+                </Button>
+              </SectionBlock>
+            ) : null}
+            <Actions>
+              <Button
+                $variant="danger"
+                onClick={() => setPending({ item: selected, action: "delete" })}
+              >
+                <Trash2 />
+                Delete innovation
+              </Button>
+            </Actions>
+          </PanelBody>
+        </Panel>
+      )}
+      {!selected && (
+        <AdminDataPanel>
+          <DataToolbar>
+            <SearchControl>
+              <Search aria-hidden="true" />
+              <Input
+                aria-label="Search innovations"
+                placeholder="Search innovations by title, owner, sector, or category"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </SearchControl>
+            <ToolbarFilters>
+              <Select
+                aria-label="Filter innovations by status"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+              >
+                <option value="ALL">All statuses</option>
+                {Array.from(new Set(items.map((item) => item.status)))
+                  .sort()
+                  .map((status) => (
+                    <option key={status} value={status}>
+                      {status.replaceAll("_", " ")}
+                    </option>
+                  ))}
+              </Select>
+              <Select
+                aria-label="Filter innovations by category"
+                value={categoryFilter}
+                onChange={(event) => setCategoryFilter(event.target.value)}
+              >
+                <option value="ALL">All categories</option>
+                {categories.map((category) => (
+                  <option key={category}>{category}</option>
+                ))}
+              </Select>
+              <Select
+                aria-label="Filter innovations by assignment"
+                value={assignedFilter}
+                onChange={(event) => setAssignedFilter(event.target.value)}
+              >
+                <option value="ALL">All assignments</option>
+                <option value="ASSIGNED">Assigned</option>
+                <option value="UNASSIGNED">Unassigned</option>
+              </Select>
+            </ToolbarFilters>
+          </DataToolbar>
+          <TableWrap>
+            <InnovationManagementTable>
+              <thead>
+                <tr>
+                  <th>Innovation</th>
+                  <th>Category</th>
+                  <th>Owner</th>
+                  <th>Assigned to</th>
+                  <th>Completion</th>
+                  <th>Status</th>
+                  <th>Decision</th>
+                  <th>Submitted</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredItems.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <TableTitle>
+                        <strong>{item.title}</strong>
+                        <small>{item.sector || "No sector"}</small>
+                        <Link to={`/admin/innovations/${item.id}`}>
+                          View details
+                        </Link>
+                      </TableTitle>
+                    </td>
+                    <td>
+                      <CategoryPill>
+                        {item.category || "Uncategorized"}
+                      </CategoryPill>
+                    </td>
+                    <td>{item.owner}</td>
+                    <td>
+                      {item.assignment ? (
+                        <AssignedExpert>
+                          <RowAvatar>
+                            {initials(item.assignment.expert)}
+                          </RowAvatar>
+                          <span>
+                            <strong>{item.assignment.expert}</strong>
+                            <small>Assignment locked</small>
+                          </span>
+                        </AssignedExpert>
+                      ) : (
+                        <MutedText>Not assigned</MutedText>
+                      )}
+                    </td>
+                    <td>
+                      <CompletionCell>
+                        <span>{item.completion}%</span>
+                        <ProgressTrack
+                          aria-label={`${item.completion}% complete`}
+                        >
+                          <i style={{ width: `${item.completion}%` }} />
+                        </ProgressTrack>
+                      </CompletionCell>
+                    </td>
+                    <td>
+                      <StatusBadge status={item.status} />
+                    </td>
+                    <td>
+                      <Select
+                        aria-label={`Change status for ${item.title}`}
+                        value={item.status}
+                        onChange={(e) =>
+                          setPending({
+                            item,
+                            action: "status",
+                            status: e.target.value,
+                          })
+                        }
+                      >
+                        <option value={item.status}>
+                          {item.status.replaceAll("_", " ")}
+                        </option>
+                        <option value="UNDER_REVIEW">Under review</option>
+                        <option value="REVISION_REQUIRED">
+                          Revision required
+                        </option>
+                        <option value="APPROVED">Approved</option>
+                        <option value="REJECTED">Rejected</option>
+                        <option value="PUBLISHED">Published</option>
+                        <option value="ARCHIVED">Archived</option>
+                      </Select>
+                    </td>
+                    <td>
+                      {item.submittedAt ? formatDate(item.submittedAt) : "—"}
+                    </td>
+                    <td>
+                      <RowActions>
+                        <IconButtonLink
+                          to={`/admin/innovations/${item.id}`}
+                          aria-label={`View ${item.title}`}
+                          title="View innovation"
+                        >
+                          <Eye />
+                        </IconButtonLink>
+                        {item.assignment ? (
+                          <LockedAssignment
+                            title={`Assigned to ${item.assignment.expert}`}
+                          >
+                            <LockKeyhole />
+                            Assigned
+                          </LockedAssignment>
+                        ) : (
+                          <RowActionButton
+                            type="button"
+                            disabled={!canAssignExpert(item)}
+                            onClick={() => openAssignment(item)}
+                            title={
+                              canAssignExpert(item)
+                                ? "Assign an Expert"
+                                : item.status === "ARCHIVED"
+                                  ? "Archived innovations cannot be assigned"
+                                  : "Submit and freeze the innovation before assignment"
+                            }
+                          >
+                            <UserCheck />
+                            Assign Expert
+                          </RowActionButton>
+                        )}
+                      </RowActions>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </InnovationManagementTable>
+          </TableWrap>
+          {!filteredItems.length && (
+            <EmptyState
+              title="No innovations match these filters"
+              copy="Try a broader search or reset the status, category, and assignment filters."
+            />
+          )}
+          <TableFooter>
+            <span>
+              Showing {filteredItems.length} of {items.length} innovations
+            </span>
+            <span>Page 1 of 1</span>
+          </TableFooter>
+        </AdminDataPanel>
+      )}
+      {editing && (
+        <InnovationAdminEditor
+          item={editing === "new" ? null : editing}
+          owners={(data?.users ?? []).filter(
+            (user) => user.role === "INNOVATOR",
+          )}
+          onCancel={() => setEditing(null)}
+          onSave={save}
+        />
+      )}
+      {pending && (
+        <ConfirmationDialog
+          title={
+            pending.action === "delete"
+              ? `Delete ${pending.item.title}?`
+              : `Change ${pending.item.title} to ${pending.status?.replaceAll("_", " ").toLowerCase()}?`
+          }
+          message={
+            pending.action === "delete"
+              ? "This permanently removes an innovation that has no review or engagement history."
+              : "The innovation status will change immediately and its owner will be notified."
+          }
+          confirmLabel="Yes"
+          danger={
+            pending.action === "delete" ||
+            pending.status === "REJECTED" ||
+            pending.status === "ARCHIVED"
+          }
+          onCancel={() => setPending(null)}
+          onConfirm={decide}
+        />
+      )}
+      {assigning && (
+        <ModalBackdrop role="presentation">
+          <Modal
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="assignment-title"
+          >
+            <PanelHeader>
+              <div>
+                <h2 id="assignment-title">Assign an Expert</h2>
+                <p>{assigning.title}</p>
+              </div>
+              <button
+                aria-label="Close assignment dialog"
+                onClick={closeAssignment}
+              >
+                <X />
+              </button>
+            </PanelHeader>
+            <PanelBody>
+              {assignmentError && (
+                <ErrorBox role="alert">{assignmentError}</ErrorBox>
+              )}
+              <AssignmentNotice>
+                <LockKeyhole />
+                <span>
+                  <strong>This is a one-time assignment</strong>
+                  <small>
+                    After confirmation, the assigned Expert cannot be replaced.
+                  </small>
+                </span>
+              </AssignmentNotice>
+              <Field label="Approved Expert">
+                <Select
+                  autoFocus
+                  value={expertId}
+                  onChange={(event) => setExpertId(event.target.value)}
+                >
+                  <option value="">Select an approved Expert</option>
+                  {approvedExperts.map((expert) => (
+                    <option key={expert.id} value={expert.id}>
+                      {expert.name} ({expert.email})
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Due date (optional)">
+                <Input
+                  type="date"
+                  value={assignmentDueAt}
+                  onChange={(event) => setAssignmentDueAt(event.target.value)}
+                />
+              </Field>
+              {!approvedExperts.length && (
+                <ErrorBox>
+                  No approved Expert accounts are currently available.
+                </ErrorBox>
+              )}
+              <Actions>
+                <Button
+                  $variant="secondary"
+                  disabled={assignmentBusy}
+                  onClick={closeAssignment}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={
+                    assignmentBusy || !expertId || !approvedExperts.length
+                  }
+                  onClick={assign}
+                >
+                  <UserCheck />
+                  {assignmentBusy ? "Assigning..." : "Confirm assignment"}
+                </Button>
+              </Actions>
+            </PanelBody>
+          </Modal>
+        </ModalBackdrop>
+      )}
+    </>
+  );
+}
+
+function InnovationAdminEditor({
+  item,
+  owners,
+  onCancel,
+  onSave,
+}: {
+  item: Innovation | null;
+  owners: Account[];
+  onCancel: () => void;
+  onSave: (input: Record<string, unknown>) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const fields: Array<[keyof Innovation, string]> = [
+    ["title", "Title"],
+    ["summary", "Summary"],
+    ["problem", "Problem or need"],
+    ["solution", "Proposed solution"],
+    ["beneficiaries", "Beneficiaries"],
+    ["sector", "Sector"],
+    ["category", "Category"],
+    ["district", "District"],
+    ["maturity", "Maturity"],
+    ["impactArea", "Impact area"],
+    ["impact", "Expected impact"],
+    ["novelty", "What is new"],
+    ["currentEvidence", "Current evidence"],
+    ["implementationPlan", "Implementation plan"],
+    ["scalability", "Scalability"],
+    ["sustainability", "Sustainability"],
+    ["supportNeeded", "Support needed"],
+  ];
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const input = Object.fromEntries(
+      fields.map(([key]) => [key, String(form.get(key))]),
+    );
+    if (!item) input.ownerId = String(form.get("ownerId"));
+    setBusy(true);
+    try {
+      await onSave(input);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <ModalBackdrop role="presentation">
+      <WideModal
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="innovation-editor-title"
+      >
+        <PanelHeader>
+          <div>
+            <h2 id="innovation-editor-title">
+              {item ? "Edit innovation information" : "Create innovation draft"}
+            </h2>
+            <p>The System Administrator can manage every innovation record.</p>
+          </div>
+          <button aria-label="Close" onClick={onCancel}>
+            <X />
+          </button>
+        </PanelHeader>
+        <PanelBody>
+          <AdminForm onSubmit={submit}>
+            {!item && (
+              <Field label="Innovator owner">
+                <Select name="ownerId" required defaultValue="">
+                  <option value="" disabled>
+                    Choose an Innovator
+                  </option>
+                  {owners.map((owner) => (
+                    <option key={owner.id} value={owner.id}>
+                      {owner.name} ({owner.email})
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+            <FormGrid>
+              {fields.map(([key, label]) => {
+                const narrative = ![
+                  "title",
+                  "sector",
+                  "category",
+                  "district",
+                  "maturity",
+                  "impactArea",
+                ].includes(String(key));
+                return (
+                  <Field key={String(key)} label={label}>
+                    {narrative ? (
+                      <Textarea
+                        name={String(key)}
+                        defaultValue={item?.[key] as string}
+                      />
+                    ) : (
+                      <Input
+                        name={String(key)}
+                        required={key === "title"}
+                        defaultValue={item?.[key] as string}
+                      />
+                    )}
+                  </Field>
+                );
+              })}
+            </FormGrid>
+            <Actions>
+              <Button type="button" $variant="secondary" onClick={onCancel}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={busy || (!item && owners.length === 0)}
+              >
+                {busy ? "Saving..." : "Save innovation"}
+              </Button>
+            </Actions>
+          </AdminForm>
+        </PanelBody>
+      </WideModal>
+    </ModalBackdrop>
+  );
+}
+
+function TaxonomiesPage() {
+  const { request, notify } = usePlatform();
+  const [items, setItems] = useState<Taxonomy[]>([]);
+  const [type, setType] = useState("SECTOR");
+  const [label, setLabel] = useState("");
+  const [error, setError] = useState("");
+  const load = () =>
+    request<Taxonomy[]>("/api/v1/admin/taxonomies")
+      .then(setItems)
+      .catch((cause) => setError(messageOf(cause)));
+  useEffect(() => {
+    void load();
+  }, []);
+  const add = async () => {
+    try {
+      await request("/api/v1/admin/taxonomies", {
+        method: "POST",
+        body: JSON.stringify({ type, label }),
+      });
+      setLabel("");
+      notify("Classification item added.");
+      load();
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+  const toggle = async (item: Taxonomy) => {
+    try {
+      await request(`/api/v1/admin/taxonomies/${item.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ isActive: !item.isActive }),
+      });
+      load();
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+  const grouped = useMemo(
+    () =>
+      items.reduce<Record<string, Taxonomy[]>>((result, item) => {
+        (result[item.type] ??= []).push(item);
+        return result;
+      }, {}),
+    [items],
+  );
+  return (
+    <>
+      <PageHeader
+        eyebrow="Classification"
+        title="Sectors and categories"
+        description="Manage the simple lists used by Innovators and public discovery."
+      />
+      {error && <ErrorBox>{error}</ErrorBox>}
+      <Panel>
+        <PanelHeader>
+          <h2>Add classification item</h2>
+        </PanelHeader>
+        <PanelBody>
+          <InlineForm>
+            <Select value={type} onChange={(e) => setType(e.target.value)}>
+              <option value="SECTOR">Sector</option>
+              <option value="CATEGORY">Category</option>
+              <option value="DISTRICT">District</option>
+              <option value="MATURITY_LEVEL">Maturity level</option>
+              <option value="IMPACT_AREA">Impact area</option>
+            </Select>
+            <Input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Item label"
+            />
+            <Button disabled={!label.trim()} onClick={add}>
+              <Plus />
+              Add
+            </Button>
+          </InlineForm>
+        </PanelBody>
+      </Panel>
+      <TaxonomyGrid>
+        {Object.entries(grouped).map(([key, values]) => (
+          <Panel key={key}>
+            <PanelHeader>
+              <h2>{key.replaceAll("_", " ")}</h2>
+            </PanelHeader>
+            <PanelBody>
+              <TagList>
+                {values?.map((item) => (
+                  <button
+                    key={item.id}
+                    className={item.isActive ? "" : "inactive"}
+                    onClick={() => toggle(item)}
+                  >
+                    {item.label}
+                    <small>{item.isActive ? "Active" : "Inactive"}</small>
+                  </button>
+                ))}
+              </TagList>
+            </PanelBody>
+          </Panel>
+        ))}
+      </TaxonomyGrid>
+    </>
+  );
+}
+
+function CriteriaPage() {
+  const { request, notify } = usePlatform();
+  const [items, setItems] = useState<CriteriaVersion[]>([]);
+  const [show, setShow] = useState(false);
+  const [version, setVersion] = useState("v1.1");
+  const [name, setName] = useState("Prototype innovation evaluation");
+  const [error, setError] = useState("");
+  const load = () =>
+    request<CriteriaVersion[]>("/api/v1/admin/criteria")
+      .then(setItems)
+      .catch((cause) => setError(messageOf(cause)));
+  useEffect(() => {
+    void load();
+  }, []);
+  const create = async () => {
+    const criteria = [
+      "Problem relevance",
+      "Solution quality",
+      "Feasibility",
+      "Potential impact",
+      "Maturity and evidence",
+    ].map((item) => ({ name: item, weight: 20 }));
+    try {
+      await request("/api/v1/admin/criteria", {
+        method: "POST",
+        body: JSON.stringify({ version, name, criteria }),
+      });
+      notify("Draft evaluation criteria created.");
+      setShow(false);
+      load();
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+  return (
+    <>
+      <PageHeader
+        eyebrow="Evaluation"
+        title="Evaluation criteria"
+        description="Simple weighted criteria for the next Expert phase. Weights must total 100%."
+        action={
+          <Button onClick={() => setShow((value) => !value)}>
+            <Plus />
+            New draft
+          </Button>
+        }
+      />
+      {error && <ErrorBox>{error}</ErrorBox>}
+      {show && (
+        <Panel>
+          <PanelBody>
+            <FormGrid>
+              <Field label="Version">
+                <Input
+                  value={version}
+                  onChange={(e) => setVersion(e.target.value)}
+                />
+              </Field>
+              <Field label="Name">
+                <Input value={name} onChange={(e) => setName(e.target.value)} />
+              </Field>
+            </FormGrid>
+            <p>Creates five standard criteria at 20% each.</p>
+            <Button onClick={create}>Create criteria draft</Button>
+          </PanelBody>
+        </Panel>
+      )}
+      <CardGrid>
+        {items.map((item) => (
+          <Panel key={item.id}>
+            <PanelBody>
+              <StatusBadge status={item.status} />
+              <h2>{item.name}</h2>
+              <p>{item.version}</p>
+              <CriteriaList>
+                {item.criteria.map((criterion) => (
+                  <div key={criterion.name}>
+                    <span>{criterion.name}</span>
+                    <strong>{criterion.weight}%</strong>
+                  </div>
+                ))}
+              </CriteriaList>
+            </PanelBody>
+          </Panel>
+        ))}
+      </CardGrid>
+    </>
+  );
+}
+
+function ReportsPage() {
+  const { request } = usePlatform();
+  const [report, setReport] = useState<Record<string, unknown> | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    request<Record<string, unknown>>("/api/v1/admin/reports/summary")
+      .then(setReport)
+      .catch((cause) => setError(messageOf(cause)));
+  }, []);
+  return (
+    <>
+      <PageHeader
+        eyebrow="System reports"
+        title="Prototype summary report"
+        description="Current database totals only. Advanced exports are intentionally outside this phase."
+      />
+      {error && <ErrorBox>{error}</ErrorBox>}
+      {report ? (
+        <ReportPre>{JSON.stringify(report, null, 2)}</ReportPre>
+      ) : (
+        <LoadingPanel />
+      )}
+    </>
+  );
+}
+
+function SettingsPage() {
+  const { request, notify } = usePlatform();
+  const [settings, setSettings] = useState<SettingsData | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    request<SettingsData>("/api/v1/admin/settings")
+      .then(setSettings)
+      .catch((cause) => setError(messageOf(cause)));
+  }, []);
+  if (error) return <ErrorBox>{error}</ErrorBox>;
+  if (!settings) return <LoadingPanel />;
+  const save = async () => {
+    try {
+      const saved = await request<SettingsData>("/api/v1/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify(settings),
+      });
+      setSettings(saved);
+      notify("Prototype settings saved.");
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+  return (
+    <>
+      <PageHeader
+        eyebrow="Configuration"
+        title="Platform settings"
+        description="Only settings used by this prototype are included."
+      />
+      <SettingsGrid>
+        <Panel>
+          <PanelBody>
+            <Setting>
+              <span>
+                <strong>Public statistics</strong>
+                <small>Show aggregate statistics.</small>
+              </span>
+              <input
+                type="checkbox"
+                checked={settings.publicStatistics}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    publicStatistics: e.target.checked,
+                  })
+                }
+              />
+            </Setting>
+            <Setting>
+              <span>
+                <strong>Allow comments</strong>
+                <small>Foundation for the next Expert phase.</small>
+              </span>
+              <input
+                type="checkbox"
+                checked={settings.allowComments}
+                onChange={(e) =>
+                  setSettings({ ...settings, allowComments: e.target.checked })
+                }
+              />
+            </Setting>
+            <Setting>
+              <span>
+                <strong>Maintenance mode</strong>
+                <small>Record the platform availability choice.</small>
+              </span>
+              <input
+                type="checkbox"
+                checked={settings.maintenanceMode}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    maintenanceMode: e.target.checked,
+                  })
+                }
+              />
+            </Setting>
+            <Field label="Maximum upload size (MB)">
+              <Input
+                type="number"
+                min="1"
+                max="100"
+                value={settings.maxFileSizeMb}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    maxFileSizeMb: Number(e.target.value),
+                  })
+                }
+              />
+            </Field>
+            <Actions>
+              <Button onClick={save}>
+                <Save />
+                Save settings
+              </Button>
+            </Actions>
+          </PanelBody>
+        </Panel>
+      </SettingsGrid>
+    </>
+  );
+}
+
+function NotificationsPage() {
+  const { data, request, refreshWorkspace, notify } = usePlatform();
+  const items = data?.notifications ?? [];
+  const read = async () => {
+    await request("/api/v1/users/me/notifications/read", {
+      method: "POST",
+      body: "{}",
+    });
+    await refreshWorkspace();
+    notify("Notifications marked as read.");
+  };
+  return (
+    <>
+      <PageHeader
+        eyebrow="Updates"
+        title="Notifications"
+        description="Account approvals, innovation submissions, decisions, and feedback."
+        action={
+          <Button $variant="secondary" onClick={read}>
+            Mark all read
+          </Button>
+        }
+      />
+      <Panel>
+        {items.length ? (
+          <RecordList>
+            {items.map((item) => (
+              <div key={item.id}>
+                <Bell />
+                <span>
+                  <strong>{item.title}</strong>
+                  <small>
+                    {item.message} · {formatDate(item.time)}
+                  </small>
+                </span>
+                {!item.read && <Unread>New</Unread>}
+              </div>
+            ))}
+          </RecordList>
+        ) : (
+          <EmptyState
+            title="No notifications"
+            copy="Important workflow updates will appear here."
+          />
+        )}
+      </Panel>
+    </>
+  );
+}
+
+function ProfilePage() {
+  const { user, data, request, refreshWorkspace, notify } = usePlatform();
+  const [form, setForm] = useState({
+    displayName: user?.name ?? "",
+    identificationType: "",
+    identificationNumber: "",
+    phoneNumber: "",
+    educationLevel: "",
+    province: "",
+    district: "",
+    administrativeSector: "",
+    occupation: "",
+    yearsOfExperience: 0,
+    organization: "",
+    preferredLanguage: "en",
+    publicProfile: true,
+  });
+  const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [busy, setBusy] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  useEffect(() => {
+    request<Record<string, unknown>>("/api/v1/users/me/profile")
+      .then((profile) =>
+        setForm((old) => ({
+          ...old,
+          displayName: String(profile.name ?? old.displayName),
+          identificationType: String(profile.identificationType ?? ""),
+          identificationNumber: String(profile.identificationNumber ?? ""),
+          phoneNumber: String(profile.phoneNumber ?? ""),
+          educationLevel: String(profile.educationLevel ?? ""),
+          province: String(profile.province ?? ""),
+          district: String(profile.district ?? ""),
+          administrativeSector: String(profile.administrativeSector ?? ""),
+          occupation: String(profile.occupation ?? ""),
+          yearsOfExperience: Number(profile.yearsOfExperience ?? 0),
+          organization: String(profile.organization ?? ""),
+          preferredLanguage: String(profile.preferredLanguage ?? "en"),
+          publicProfile: Boolean(profile.publicProfile),
+        })),
+      )
+      .catch((cause) => setError(messageOf(cause)));
+  }, []);
+  const locations = data?.taxonomies.locations ?? {};
+  const districts = Object.keys(locations[form.province] ?? {});
+  const sectors = locations[form.province]?.[form.district] ?? [];
+  const update = (
+    field: keyof typeof form,
+    value: string | number | boolean,
+  ) => {
+    setForm((old) => ({ ...old, [field]: value }));
+    setFieldErrors((old) => {
+      const next = { ...old };
+      delete next[field];
+      return next;
+    });
+  };
+  const validate = () => {
+    const details: FieldErrors = {};
+    if (form.displayName.trim().length < 2)
+      details.displayName = "Enter your names as shown on your identification.";
+    if (!form.identificationType)
+      details.identificationType = "Select an identification type.";
+    if (form.identificationNumber.trim().length < 5)
+      details.identificationNumber = "Enter a valid identification number.";
+    if (!/^(?:\+2507\d{8}|07\d{8})$/.test(form.phoneNumber))
+      details.phoneNumber =
+        "Use a Rwanda mobile number such as +250 7XX XXX XXX.";
+    if (!form.educationLevel)
+      details.educationLevel = "Select your level of education.";
+    if (form.occupation.trim().length < 2)
+      details.occupation = "Enter your occupation or area of work.";
+    if (form.yearsOfExperience < 0 || form.yearsOfExperience > 60)
+      details.yearsOfExperience = "Enter a value between 0 and 60.";
+    if (!form.province) details.province = "Select a Province.";
+    if (!form.district) details.district = "Select a District.";
+    if (!form.administrativeSector)
+      details.administrativeSector = "Select a Sector.";
+    return details;
+  };
+  const save = async () => {
+    const details = validate();
+    if (Object.keys(details).length) {
+      setFieldErrors(details);
+      setError("Correct the highlighted profile fields.");
+      focusFirstError(details, "profile");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setFieldErrors({});
+    try {
+      await request("/api/v1/users/me/profile", {
+        method: "PUT",
+        body: JSON.stringify(form),
+      });
+      await refreshWorkspace();
+      notify(`${friendlyRole(user?.role ?? "PUBLIC_USER")} profile saved.`);
+    } catch (cause) {
+      const apiErrors = errorsFrom(cause);
+      setFieldErrors(apiErrors);
+      setError(messageOf(cause));
+      focusFirstError(apiErrors, "profile");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const submitForReview = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await request("/api/v1/users/me/profile/submit", {
+        method: "POST",
+        body: "{}",
+      });
+      setSubmitted(true);
+    } catch (cause) {
+      setError(messageOf(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <PageHeader
+        eyebrow={`${friendlyRole(user?.role ?? "PUBLIC_USER")} account`}
+        title={`Complete your ${friendlyRole(user?.role ?? "PUBLIC_USER")} profile`}
+        description="Provide the identity, contact, location, education, and professional information the System Administrator needs to review your account."
+      />
+      {user?.approvalStatus === "REJECTED" && (
+        <ProfileNotice>
+          <CircleAlert />
+          <span>
+            <strong>Changes requested</strong>Update the information below, save
+            it, and submit the profile again for review.
+          </span>
+        </ProfileNotice>
+      )}
+      {!user?.profileComplete && (
+        <ProfileNotice>
+          <ShieldCheck />
+          <span>
+            <strong>Profile required</strong>Complete and save this form before
+            submitting it for administrator review.
+          </span>
+        </ProfileNotice>
+      )}
+      {error && (
+        <ValidationSummary role="alert" aria-live="assertive">
+          <CircleAlert />
+          <div>
+            <strong>{error}</strong>
+            {Object.keys(fieldErrors).length > 0 && (
+              <ul>
+                {Object.entries(fieldErrors).map(([field, message]) => (
+                  <li key={field}>
+                    <button
+                      onClick={() =>
+                        document.getElementById(`profile-${field}`)?.focus()
+                      }
+                    >
+                      {message}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </ValidationSummary>
+      )}
+      <Panel>
+        <PanelHeader>
+          <div>
+            <h2>Personal and contact information</h2>
+            <p>
+              Fields marked by the form are required unless identified as
+              optional.
+            </p>
+          </div>
+        </PanelHeader>
+        <PanelBody>
+          <FormGrid>
+            <Field label="Names" error={fieldErrors.displayName}>
+              <Input
+                id="profile-displayName"
+                value={form.displayName}
+                placeholder="Enter your names as shown on your identification"
+                autoComplete="name"
+                onChange={(e) => update("displayName", e.target.value)}
+              />
+            </Field>
+            <Field label="Email address">
+              <Input
+                value={user?.email ?? ""}
+                type="email"
+                readOnly
+                aria-readonly="true"
+              />
+            </Field>
+            <Field
+              label="Identification type"
+              error={fieldErrors.identificationType}
+            >
+              <Select
+                id="profile-identificationType"
+                value={form.identificationType}
+                onChange={(e) => update("identificationType", e.target.value)}
+              >
+                <option value="">Select identification type</option>
+                <option value="NATIONAL_ID">Rwanda National ID</option>
+                <option value="PASSPORT">Passport</option>
+                <option value="OTHER_GOVERNMENT_ID">
+                  Other government-issued ID
+                </option>
+              </Select>
+            </Field>
+            <Field
+              label="Identification number"
+              error={fieldErrors.identificationNumber}
+            >
+              <Input
+                id="profile-identificationNumber"
+                value={form.identificationNumber}
+                placeholder="Enter the number exactly as issued"
+                onChange={(e) => update("identificationNumber", e.target.value)}
+              />
+            </Field>
+            <Field label="Phone number" error={fieldErrors.phoneNumber}>
+              <Input
+                id="profile-phoneNumber"
+                value={form.phoneNumber}
+                type="tel"
+                autoComplete="tel"
+                placeholder="+250 7XX XXX XXX"
+                onChange={(e) =>
+                  update("phoneNumber", e.target.value.replaceAll(" ", ""))
+                }
+              />
+            </Field>
+            <Field
+              label="Level of education"
+              error={fieldErrors.educationLevel}
+            >
+              <Select
+                id="profile-educationLevel"
+                value={form.educationLevel}
+                onChange={(e) => update("educationLevel", e.target.value)}
+              >
+                <option value="">Select education level</option>
+                {data?.taxonomies.educationLevels.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field
+              label="Occupation or area of work"
+              error={fieldErrors.occupation}
+            >
+              <Input
+                id="profile-occupation"
+                value={form.occupation}
+                placeholder="Example: Agricultural technician"
+                onChange={(e) => update("occupation", e.target.value)}
+              />
+            </Field>
+            <Field
+              label="Years of relevant experience (optional)"
+              error={fieldErrors.yearsOfExperience}
+            >
+              <Input
+                id="profile-yearsOfExperience"
+                type="number"
+                min="0"
+                max="60"
+                value={form.yearsOfExperience}
+                onChange={(e) =>
+                  update("yearsOfExperience", Number(e.target.value))
+                }
+              />
+            </Field>
+            <Field label="Province" error={fieldErrors.province}>
+              <Select
+                id="profile-province"
+                value={form.province}
+                onChange={(e) => {
+                  setForm({
+                    ...form,
+                    province: e.target.value,
+                    district: "",
+                    administrativeSector: "",
+                  });
+                  setFieldErrors((old) => ({
+                    ...old,
+                    province: "",
+                    district: "",
+                    administrativeSector: "",
+                  }));
+                }}
+              >
+                <option value="">Select Province</option>
+                {Object.keys(locations).map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="District" error={fieldErrors.district}>
+              <Select
+                id="profile-district"
+                value={form.district}
+                disabled={!form.province}
+                onChange={(e) => {
+                  setForm({
+                    ...form,
+                    district: e.target.value,
+                    administrativeSector: "",
+                  });
+                  setFieldErrors((old) => ({
+                    ...old,
+                    district: "",
+                    administrativeSector: "",
+                  }));
+                }}
+              >
+                <option value="">Select District</option>
+                {districts.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Sector" error={fieldErrors.administrativeSector}>
+              <Select
+                id="profile-administrativeSector"
+                value={form.administrativeSector}
+                disabled={!form.district}
+                onChange={(e) => update("administrativeSector", e.target.value)}
+              >
+                <option value="">Select Sector</option>
+                {sectors.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Organization or cooperative (optional)">
+              <Input
+                value={form.organization}
+                placeholder="Leave blank if you work independently"
+                onChange={(e) =>
+                  setForm({ ...form, organization: e.target.value })
+                }
+              />
+            </Field>
+            <Field label="Preferred language">
+              <Select
+                value={form.preferredLanguage}
+                onChange={(e) =>
+                  setForm({ ...form, preferredLanguage: e.target.value })
+                }
+              >
+                <option value="en">English</option>
+                <option value="rw">Kinyarwanda</option>
+              </Select>
+            </Field>
+          </FormGrid>
+          <Setting>
+            <span>
+              <strong>
+                Show my {friendlyRole(user?.role ?? "PUBLIC_USER")} identity on
+                published work
+              </strong>
+              <small>
+                Private identification and phone details are never public.
+              </small>
+            </span>
+            <input
+              type="checkbox"
+              checked={form.publicProfile}
+              onChange={(e) =>
+                setForm({ ...form, publicProfile: e.target.checked })
+              }
+            />
+          </Setting>
+          <Actions>
+            <Button disabled={busy} onClick={save}>
+              <Save />
+              {busy ? "Saving..." : "Save profile"}
+            </Button>
+            {user?.profileComplete && user.approvalStatus !== "APPROVED" && (
+              <Button disabled={busy} onClick={submitForReview}>
+                <ShieldCheck />
+                Submit profile for review
+              </Button>
+            )}
+          </Actions>
+        </PanelBody>
+      </Panel>
+      {submitted && (
+        <ModalBackdrop role="presentation">
+          <Modal
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="review-submitted-title"
+          >
+            <PanelBody>
+              <ShieldCheck size={34} />
+              <h2 id="review-submitted-title">Your profile is under review</h2>
+              <p>
+                Your information was submitted successfully. Please wait for the
+                System Administrator to approve your{" "}
+                {friendlyRole(user?.role ?? "PUBLIC_USER")} account.
+              </p>
+              <Actions>
+                <Button
+                  onClick={async () => {
+                    setSubmitted(false);
+                    await refreshWorkspace();
+                  }}
+                >
+                  Continue
+                </Button>
+              </Actions>
+            </PanelBody>
+          </Modal>
+        </ModalBackdrop>
+      )}
+    </>
+  );
+}
+
+function ConfirmationDialog({
+  title,
+  message,
+  confirmLabel,
+  danger = false,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  danger?: boolean;
+  onCancel: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <ModalBackdrop role="presentation">
+      <Modal role="dialog" aria-modal="true" aria-labelledby="decision-title">
+        <PanelHeader>
+          <div>
+            <h2 id="decision-title">{title}</h2>
+            <p>{message}</p>
+          </div>
+          <button aria-label="Close" onClick={onCancel}>
+            <X />
+          </button>
+        </PanelHeader>
+        <PanelBody>
+          <Actions>
+            <Button $variant="secondary" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button
+              autoFocus
+              $variant={danger ? "danger" : "primary"}
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await onConfirm();
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {busy ? "Saving..." : confirmLabel}
+            </Button>
+          </Actions>
+        </PanelBody>
+      </Modal>
+    </ModalBackdrop>
+  );
+}
+
+function LoadingPanel() {
+  return (
+    <Panel>
+      <PanelBody>
+        <p>Loading current records...</p>
+      </PanelBody>
+    </Panel>
+  );
+}
+function NotFoundSection() {
+  return (
+    <EmptyState
+      title="Page not found"
+      copy="Choose a section from the workspace navigation."
+    />
+  );
+}
+const downloadCsv = (
+  filename: string,
+  headers: string[],
+  rows: Array<Array<string | number>>,
+) => {
+  const safeCell = (value: string | number) => {
+    let text = String(value ?? "");
+    if (/^[=+\-@]/.test(text)) text = `'${text}`;
+    return `"${text.replaceAll('"', '""')}"`;
+  };
+  const csv = [headers, ...rows]
+    .map((row) => row.map(safeCell).join(","))
+    .join("\r\n");
+  const url = URL.createObjectURL(
+    new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }),
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+const messageOf = (cause: unknown) =>
+  cause instanceof Error
+    ? cause.message
+    : "The request could not be completed.";
+const friendlyRole = (role: Role) =>
+  ({
+    SYSTEM_ADMINISTRATOR: "System Administrator",
+    INNOVATOR: "Innovator",
+    EXPERT: "Expert",
+    INVESTOR_PARTNER: "Investor / Industry Partner",
+    PUBLIC_USER: "Public User",
+  })[role];
+const initials = (name: string) =>
+  name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+const formatDate = (value: string) =>
+  value
+    ? new Intl.DateTimeFormat("en-RW", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(value))
+    : "Not dated";
+
+const Shell = styled.div`
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  background: ${palette.paper};
+  @media (max-width: 960px) {
+    grid-template-columns: 1fr;
+  }
+`;
+const SkipLink = styled.a`
+  position: fixed;
+  left: 16px;
+  top: -60px;
+  z-index: 100;
+  background: white;
+  padding: 10px 14px;
+  border-radius: 8px;
+  &:focus {
+    top: 12px;
+  }
+`;
+const Sidebar = styled.aside<{ $open: boolean }>`
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow-y: auto;
+  background: ${palette.ink};
+  color: white;
+  padding: 22px 16px;
+  display: flex;
+  flex-direction: column;
+  z-index: 40;
+  @media (max-width: 960px) {
+    position: fixed;
+    width: 280px;
+    left: ${({ $open }) => ($open ? "0" : "-300px")};
+    transition: left 0.2s ease;
+  }
+`;
+const SidebarHead = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 6px 18px;
+  border-bottom: 1px solid #ffffff1f;
+  a span {
+    color: white;
+  }
+  button {
+    display: none;
+    color: white;
+    background: transparent;
+    border: 0;
+    min-width: 44px;
+    min-height: 44px;
+    @media (max-width: 960px) {
+      display: grid;
+      place-items: center;
+    }
+  }
+`;
+const Identity = styled.div`
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 18px 6px;
+  span {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 14px;
+  }
+  small {
+    color: #b7cbc6;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+`;
+const Avatar = styled.div`
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  background: ${palette.lime};
+  color: ${palette.greenDark};
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+`;
+const Nav = styled.nav`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  a {
+    min-height: 48px;
+    border-radius: 10px;
+    padding: 0 12px;
+    display: grid;
+    grid-template-columns: 22px 1fr 16px;
+    align-items: center;
+    gap: 9px;
+    color: #bcd0cb;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  svg {
+    width: 17px;
+  }
+  a.active,
+  a:hover {
+    background: #0f7867;
+    color: white;
+  }
+  a svg:last-child {
+    opacity: 0.5;
+  }
+`;
+const SidebarFoot = styled.div`
+  margin-top: auto;
+  border-top: 1px solid #ffffff1f;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  a,
+  button {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0 10px;
+    color: #bcd0cb;
+    background: transparent;
+    border: 0;
+    text-align: left;
+  }
+  svg {
+    width: 17px;
+  }
+`;
+const Workspace = styled.div`
+  min-width: 0;
+`;
+const Topbar = styled.header`
+  height: 84px;
+  background: white;
+  border-bottom: 1px solid ${palette.line};
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  > button {
+    display: none;
+    border: 0;
+    background: transparent;
+    min-width: 44px;
+    min-height: 44px;
+    @media (max-width: 960px) {
+      display: grid;
+      place-items: center;
+    }
+  }
+  > div {
+    display: flex;
+    flex-direction: column;
+  }
+  span {
+    font-size: 15px;
+    font-weight: 700;
+  }
+  small {
+    color: ${palette.muted};
+    font-size: 13px;
+  }
+  > a {
+    min-width: 44px;
+    min-height: 44px;
+    display: grid;
+    place-items: center;
+    color: ${palette.green};
+  }
+  @media (max-width: 600px) {
+    padding: 0 14px;
+  }
+`;
+const Content = styled.main`
+  padding: 38px clamp(16px, 3vw, 44px) 72px;
+  max-width: 1500px;
+  width: 100%;
+  margin: auto;
+`;
+const ManagementHeader = styled.header`
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+  gap: 28px;
+  align-items: center;
+  margin-bottom: 32px;
+  @media (max-width: 760px) {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 520px) {
+    grid-template-columns: 1fr;
+  }
+`;
+const ManagementIcon = styled.div`
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #cde6da;
+  border-radius: 16px;
+  color: ${palette.green};
+  background: linear-gradient(145deg, #f0faf5, #e2f4ec);
+  svg {
+    width: 34px;
+    height: 34px;
+    stroke-width: 1.8;
+  }
+  @media (max-width: 760px) {
+    width: 64px;
+    height: 64px;
+    svg {
+      width: 28px;
+      height: 28px;
+    }
+  }
+`;
+const ManagementHeading = styled.div`
+  min-width: 0;
+  h1 {
+    margin: 6px 0 8px;
+    color: #0d1f2d;
+    font-size: clamp(28px, 3vw, 38px);
+    line-height: 1.12;
+    letter-spacing: -0.04em;
+  }
+  p {
+    max-width: 700px;
+    margin: 0;
+    color: #415466;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+`;
+const ManagementActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  @media (max-width: 760px) {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+  @media (max-width: 520px) {
+    align-items: stretch;
+    flex-direction: column;
+    a,
+    button {
+      width: 100%;
+    }
+  }
+`;
+const AdminDataPanel = styled(Panel)`
+  overflow: hidden;
+  border-radius: 16px;
+  box-shadow: 0 12px 34px rgba(16, 42, 39, 0.07);
+`;
+const DataToolbar = styled.div`
+  min-height: 96px;
+  padding: 20px 24px;
+  border-bottom: 1px solid ${palette.line};
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  @media (max-width: 900px) {
+    align-items: stretch;
+    flex-direction: column;
+  }
+`;
+const SearchControl = styled.label`
+  min-width: min(390px, 100%);
+  height: 50px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid #cfdad5;
+  border-radius: 10px;
+  background: white;
+  color: #526779;
+  &:focus-within {
+    border-color: ${palette.green};
+    box-shadow: 0 0 0 3px #0b62551a;
+  }
+  svg {
+    width: 20px;
+    height: 20px;
+    flex: none;
+  }
+  input {
+    min-height: 46px;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    outline: none !important;
+    background: transparent;
+    font-size: 16px;
+  }
+`;
+const ToolbarFilters = styled.div`
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  select {
+    width: auto;
+    min-width: 170px;
+    min-height: 50px;
+    font-size: 16px;
+  }
+  @media (max-width: 900px) {
+    justify-content: flex-start;
+  }
+  @media (max-width: 560px) {
+    select {
+      width: 100%;
+    }
+  }
+`;
+const ManagementTable = styled(Table)`
+  min-width: 1160px;
+  th {
+    padding: 16px 18px;
+    color: #293b49;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  td {
+    padding: 18px;
+    color: #243746;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  tbody tr {
+    transition: background 180ms ease;
+  }
+`;
+const InnovationManagementTable = styled(ManagementTable)`
+  min-width: 1240px;
+  table-layout: fixed;
+  th:nth-of-type(1) {
+    width: 190px;
+  }
+  th:nth-of-type(2) {
+    width: 130px;
+  }
+  th:nth-of-type(3) {
+    width: 100px;
+  }
+  th:nth-of-type(4) {
+    width: 170px;
+  }
+  th:nth-of-type(5) {
+    width: 110px;
+  }
+  th:nth-of-type(6) {
+    width: 125px;
+  }
+  th:nth-of-type(7) {
+    width: 115px;
+  }
+  th:nth-of-type(8) {
+    width: 120px;
+  }
+  th:nth-of-type(9) {
+    width: 180px;
+  }
+  td {
+    overflow-wrap: anywhere;
+  }
+  td:nth-of-type(7) select {
+    min-width: 105px;
+  }
+`;
+const UserManagementTable = styled(ManagementTable)`
+  min-width: 1030px;
+  table-layout: fixed;
+  th:nth-of-type(1) {
+    width: 235px;
+  }
+  th:nth-of-type(2) {
+    width: 175px;
+  }
+  th:nth-of-type(3) {
+    width: 170px;
+  }
+  th:nth-of-type(4) {
+    width: 130px;
+  }
+  th:nth-of-type(5) {
+    width: 120px;
+  }
+  th:nth-of-type(6) {
+    width: 120px;
+  }
+  th:nth-of-type(7) {
+    width: 120px;
+  }
+  td {
+    overflow-wrap: anywhere;
+  }
+`;
+const IdentityCell = styled.div`
+  min-width: 210px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  span {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  strong {
+    color: #102a27;
+    font-size: 15px;
+  }
+  small {
+    color: #526779;
+    font-size: 13px;
+  }
+`;
+const RowAvatar = styled.span`
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  display: grid !important;
+  place-items: center;
+  border-radius: 50%;
+  background: ${palette.soft};
+  color: ${palette.green};
+  font-size: 14px;
+  font-weight: 800;
+`;
+const RowActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: max-content;
+`;
+const IconButtonLink = styled(ButtonLink)`
+  width: 44px;
+  padding: 0;
+  border-color: #cfdad5;
+  background: white;
+  svg {
+    width: 19px;
+    height: 19px;
+  }
+`;
+const IconButton = styled(Button)`
+  width: 44px;
+  padding: 0;
+  border-color: #cfdad5;
+  background: white;
+  color: ${palette.ink};
+  svg {
+    width: 19px;
+    height: 19px;
+  }
+`;
+const TableFooter = styled.footer`
+  min-height: 66px;
+  padding: 16px 24px;
+  border-top: 1px solid ${palette.line};
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #415466;
+  font-size: 14px;
+  @media (max-width: 520px) {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+`;
+const TableTitle = styled.div`
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  strong {
+    color: #102a27;
+    font-size: 15px;
+  }
+  small {
+    color: #526779;
+    font-size: 13px;
+  }
+  a {
+    margin-top: 3px;
+    font-size: 13px;
+  }
+`;
+const CategoryPill = styled.span`
+  display: inline-flex;
+  width: max-content;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: ${palette.soft};
+  color: ${palette.greenDark};
+  font-size: 12px;
+  font-weight: 700;
+`;
+const AssignedExpert = styled.div`
+  min-width: 180px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  > span:last-child {
+    display: flex;
+    flex-direction: column;
+  }
+  strong {
+    font-size: 14px;
+  }
+  small {
+    color: #526779;
+    font-size: 12px;
+  }
+`;
+const MutedText = styled.span`
+  color: #526779;
+`;
+const CompletionCell = styled.div`
+  min-width: 110px;
+  display: grid;
+  gap: 7px;
+  span {
+    font-variant-numeric: tabular-nums;
+  }
+`;
+const ProgressTrack = styled.span`
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dfe9e4;
+  i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: ${palette.green};
+  }
+`;
+const RowActionButton = styled(Button)`
+  padding: 0 12px;
+  white-space: nowrap;
+  font-size: 13px;
+  svg {
+    width: 17px;
+    height: 17px;
+  }
+`;
+const LockedAssignment = styled.span`
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid #cfdad5;
+  border-radius: 9px;
+  color: #526779;
+  background: #f4f7f5;
+  font-size: 13px;
+  font-weight: 700;
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+`;
+const AssignmentLock = styled.div`
+  margin: 22px 0;
+  min-height: 76px;
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #b9d9ca;
+  border-radius: 12px;
+  background: ${palette.soft};
+  color: ${palette.greenDark};
+  > svg {
+    width: 22px;
+  }
+  span {
+    display: flex;
+    flex-direction: column;
+  }
+  small {
+    color: #415466;
+    font-size: 13px;
+  }
+`;
+const AssignmentNotice = styled.div`
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 10px;
+  border: 1px solid #d9c58f;
+  border-radius: 10px;
+  background: ${palette.warningSoft};
+  color: #694006;
+  span {
+    display: flex;
+    flex-direction: column;
+  }
+  small {
+    font-size: 13px;
+  }
+`;
+const Scrim = styled.div<{ $open: boolean }>`
+  display: none;
+  @media (max-width: 960px) {
+    display: ${({ $open }) => ($open ? "block" : "none")};
+    position: fixed;
+    inset: 0;
+    background: #071e1b99;
+    z-index: 30;
+  }
+`;
+const CardGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+  h2 {
+    font-size: 18px;
+    margin: 13px 0 5px;
+  }
+  p {
+    color: ${palette.muted};
+    font-size: 13px;
+  }
+  small {
+    color: ${palette.muted};
+  }
+  @media (max-width: 1000px) {
+    grid-template-columns: 1fr 1fr;
+  }
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+`;
+const PartnerSearch = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: ${palette.paper};
+  border: 1px solid ${palette.line};
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin-bottom: 22px;
+  svg {
+    color: ${palette.green};
+    flex: none;
+  }
+  input {
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+`;
+const RecordList = styled.div`
+  > a,
+  > div {
+    min-height: 68px;
+    padding: 13px 18px;
+    border-bottom: 1px solid ${palette.line};
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+    &:last-child {
+      border: 0;
+    }
+  }
+  span {
+    display: flex;
+    flex-direction: column;
+  }
+  strong {
+    font-size: 13px;
+  }
+  small {
+    color: ${palette.muted};
+    font-size: 11px;
+  }
+  svg {
+    width: 17px;
+    color: ${palette.green};
+  }
+  code {
+    font-size: 10px;
+    color: ${palette.muted};
+  }
+`;
+const Meta = styled.div`
+  display: flex;
+  justify-content: space-between;
+  color: ${palette.muted};
+  font-size: 11px;
+  margin: 15px 0;
+`;
+const DraftRecovery = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid #b2ddff;
+  background: ${palette.infoSoft};
+  border-radius: 12px;
+  span {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  strong {
+    font-size: 14px;
+  }
+  small {
+    color: ${palette.info};
+  }
+  @media (max-width: 620px) {
+    align-items: stretch;
+    flex-direction: column;
+  }
+`;
+const StatusLine = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  color: ${palette.muted};
+  font-size: 13px;
+`;
+const ErrorBox = styled.div`
+  padding: 13px 15px;
+  margin-bottom: 18px;
+  border: 1px solid #fecdca;
+  background: ${palette.dangerSoft};
+  color: ${palette.danger};
+  border-radius: 10px;
+`;
+const ValidationSummary = styled.div`
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 10px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  border: 1px solid #fda29b;
+  background: ${palette.dangerSoft};
+  color: ${palette.danger};
+  border-radius: 10px;
+  svg {
+    margin-top: 1px;
+  }
+  strong {
+    display: block;
+  }
+  ul {
+    margin: 8px 0 0;
+    padding-left: 18px;
+  }
+  button {
+    border: 0;
+    background: transparent;
+    color: ${palette.danger};
+    padding: 2px 0;
+    text-align: left;
+    text-decoration: underline;
+    font-weight: 650;
+  }
+`;
+const LocalSaveNotice = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 13px 15px;
+  border: 1px solid #a6f4c5;
+  background: #ecfdf3;
+  color: ${palette.success};
+  border-radius: 10px;
+  span {
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+  }
+  strong {
+    font-size: 13px;
+  }
+`;
+const ProfileNotice = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid #b2ddff;
+  background: ${palette.infoSoft};
+  color: ${palette.info};
+  border-radius: 10px;
+  span {
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+  }
+  strong {
+    font-size: 13px;
+  }
+`;
+const Declarations = styled.div<{ $invalid?: boolean }>`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 16px;
+  background: ${({ $invalid }) =>
+    $invalid ? palette.dangerSoft : palette.soft};
+  border: ${({ $invalid }) =>
+    $invalid ? "1px solid #fda29b" : "1px solid transparent"};
+  border-radius: 10px;
+  label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  input {
+    margin-top: 5px;
+  }
+`;
+const InlineError = styled.small`
+  color: ${palette.danger};
+  font-weight: 700;
+  margin: 0 0 3px 26px;
+`;
+const SectionTitle = styled.h3`
+  font-size: 14px;
+  margin: 24px 0 12px;
+  padding-top: 20px;
+  border-top: 1px solid ${palette.line};
+  &:first-of-type {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+`;
+const Actions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  td & {
+    margin-top: 0;
+    justify-content: flex-start;
+    align-items: center;
+  }
+`;
+const AdminForm = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+`;
+const CheckLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 650;
+  input {
+    width: 18px;
+    height: 18px;
+  }
+`;
+const DetailGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 20px 0;
+  overflow: hidden;
+  border: 1px solid ${palette.line};
+  border-radius: 10px;
+  background: ${palette.line};
+  @media (max-width: 760px) {
+    grid-template-columns: 1fr 1fr;
+  }
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
+`;
+const DetailItem = styled.div`
+  min-width: 0;
+  padding: 14px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  small {
+    color: ${palette.muted};
+    font-size: 11px;
+  }
+  strong {
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+`;
+const NarrativeGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+  section {
+    padding: 16px;
+    border: 1px solid ${palette.line};
+    border-radius: 10px;
+    background: ${palette.paper};
+  }
+  h3 {
+    margin: 0 0 6px;
+    font-size: 13px;
+  }
+  p {
+    margin: 0;
+    color: ${palette.muted};
+    white-space: pre-wrap;
+  }
+  @media (max-width: 720px) {
+    grid-template-columns: 1fr;
+  }
+`;
+const SectionBlock = styled.section`
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid ${palette.line};
+  h3 {
+    margin: 0 0 10px;
+    font-size: 14px;
+  }
+  > p {
+    color: ${palette.muted};
+  }
+`;
+const MaterialGroup = styled.div`
+  & + & {
+    border-top: 1px solid ${palette.line};
+    margin-top: 22px;
+    padding-top: 22px;
+  }
+  h3 {
+    font-size: 14px;
+    margin: 0 0 4px;
+  }
+  p {
+    color: ${palette.muted};
+    font-size: 12px;
+    margin: 0 0 16px;
+  }
+`;
+const AttachmentNotice = styled.div`
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  margin-bottom: 16px;
+  border: 1px solid #b2ddff;
+  background: ${palette.infoSoft};
+  border-radius: 10px;
+  color: ${palette.info};
+  span {
+    display: flex;
+    flex-direction: column;
+  }
+  strong {
+    font-size: 13px;
+  }
+  small {
+    font-size: 11px;
+  }
+  @media (max-width: 680px) {
+    grid-template-columns: 24px 1fr;
+    button {
+      grid-column: 1/-1;
+    }
+  }
+`;
+const LinkForm = styled.div`
+  display: grid;
+  grid-template-columns: minmax(160px, 0.7fr) minmax(240px, 1.3fr) auto;
+  gap: 10px;
+  align-items: start;
+  margin-bottom: 18px;
+  button {
+    margin-top: 20px;
+  }
+  @media (max-width: 760px) {
+    grid-template-columns: 1fr;
+    button {
+      margin-top: 0;
+    }
+  }
+`;
+const UploadRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 210px auto;
+  gap: 10px;
+  align-items: start;
+  margin-bottom: 18px;
+  button {
+    margin-top: 20px;
+  }
+  @media (max-width: 720px) {
+    grid-template-columns: 1fr;
+    button {
+      margin-top: 0;
+    }
+  }
+`;
+const FileList = styled.div`
+  > div {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid ${palette.line};
+  }
+  svg {
+    color: ${palette.green};
+  }
+  span {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  strong {
+    font-size: 13px;
+  }
+  small {
+    color: ${palette.muted};
+    font-size: 11px;
+    overflow-wrap: anywhere;
+  }
+  a {
+    color: ${palette.green};
+    font-weight: 700;
+    font-size: 12px;
+  }
+  button {
+    min-width: 44px;
+    min-height: 44px;
+    border: 0;
+    background: transparent;
+    display: grid;
+    place-items: center;
+  }
+`;
+const DecisionReason = styled.div`
+  margin-top: 14px;
+  padding: 10px;
+  background: ${palette.paper};
+  border-radius: 8px;
+  font-size: 12px;
+  color: ${palette.muted};
+`;
+const InlineForm = styled.div`
+  display: grid;
+  grid-template-columns: 220px 1fr auto;
+  gap: 10px;
+  @media (max-width: 650px) {
+    grid-template-columns: 1fr;
+  }
+`;
+const TaxonomyGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+  @media (max-width: 720px) {
+    grid-template-columns: 1fr;
+  }
+`;
+const TagList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  button {
+    border: 1px solid ${palette.line};
+    background: ${palette.soft};
+    color: ${palette.green};
+    padding: 7px 9px;
+    border-radius: 8px;
+    font-weight: 700;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  button.inactive {
+    opacity: 0.55;
+    background: white;
+  }
+  small {
+    font-size: 9px;
+    font-weight: 500;
+  }
+`;
+const CriteriaList = styled.div`
+  display: flex;
+  flex-direction: column;
+  margin-top: 14px;
+  div {
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid ${palette.line};
+    padding: 10px 0;
+    font-size: 12px;
+  }
+`;
+const ReportPre = styled.pre`
+  white-space: pre-wrap;
+  background: ${palette.ink};
+  color: #d9e9df;
+  border-radius: 14px;
+  padding: 24px;
+  overflow: auto;
+  font-size: 13px;
+`;
+const SettingsGrid = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 720px);
+  gap: 16px;
+`;
+const Setting = styled.label`
+  min-height: 66px;
+  border-bottom: 1px solid ${palette.line};
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  span {
+    display: flex;
+    flex-direction: column;
+  }
+  small {
+    color: ${palette.muted};
+  }
+  input {
+    width: 22px;
+    height: 22px;
+  }
+`;
+const Unread = styled.b`
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: ${palette.soft};
+  color: ${palette.green};
+  font-size: 10px;
+`;
+const ModalBackdrop = styled.div`
+  position: fixed;
+  inset: 0;
+  background: #071e1b99;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+`;
+const Modal = styled(Panel)`
+  width: min(560px, 100%);
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
+  box-shadow: 0 24px 70px #071e1b55;
+  > div:first-of-type button {
+    min-width: 44px;
+    min-height: 44px;
+    border: 0;
+    background: transparent;
+    display: grid;
+    place-items: center;
+  }
+`;
+const WideModal = styled(Modal)`
+  width: min(920px, 100%);
+`;
+const UserEditorModal = styled(Modal)`
+  width: min(760px, 100%);
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  @media (max-width: 680px) {
+    input,
+    select {
+      font-size: 16px;
+    }
+  }
+`;

@@ -19,7 +19,12 @@ const roles = ['SYSTEM_ADMINISTRATOR', 'INNOVATOR', 'EXPERT', 'INVESTOR_PARTNER'
 const taxonomies = {
   SECTOR: ['Agriculture', 'Climate & Energy', 'Education', 'Health', 'Manufacturing', 'Digital Services', 'Water & Sanitation'],
   CATEGORY: ['Product innovation', 'Process innovation', 'Service innovation', 'Social innovation'],
-  DISTRICT: ['Gasabo', 'Huye', 'Kicukiro', 'Musanze', 'Nyagatare', 'Nyarugenge', 'Rubavu'],
+  DISTRICT: [
+    'Bugesera', 'Burera', 'Gakenke', 'Gasabo', 'Gatsibo', 'Gicumbi', 'Gisagara', 'Huye',
+    'Kamonyi', 'Karongi', 'Kayonza', 'Kicukiro', 'Kirehe', 'Muhanga', 'Musanze', 'Ngoma',
+    'Ngororero', 'Nyabihu', 'Nyagatare', 'Nyamagabe', 'Nyamasheke', 'Nyanza', 'Nyarugenge',
+    'Nyaruguru', 'Rubavu', 'Ruhango', 'Rulindo', 'Rusizi', 'Rutsiro', 'Rwamagana'
+  ],
   MATURITY_LEVEL: ['M1 Idea', 'M2 Concept', 'M3 Prototype', 'M4 Pilot', 'M5 Operational', 'M6 Scaling'],
   IMPACT_AREA: ['Food security', 'Green jobs', 'Health access', 'Learning outcomes', 'Climate resilience', 'Financial inclusion']
 };
@@ -31,7 +36,18 @@ function codeFor(label) {
 
 async function createInitialUser({ email, password, roleCode, name, organization, district }) {
   const normalizedEmail = email.toLowerCase();
-  if (await prisma.user.findUnique({ where: { email: normalizedEmail } })) return;
+  const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+  if (existingUser) {
+    // Prototype seed accounts should open their workspace immediately. Do not
+    // reset their password when seeding an existing local database.
+    if (existingUser.mustChangePassword) {
+      await prisma.user.update({
+        where: { id: existingUser.id },
+        data: { mustChangePassword: false }
+      });
+    }
+    return;
+  }
   const role = await prisma.role.findUniqueOrThrow({ where: { code: roleCode } });
   await prisma.user.create({
     data: {
@@ -40,7 +56,7 @@ async function createInitialUser({ email, password, roleCode, name, organization
       roleId: role.id,
       status: 'ACTIVE',
       emailVerifiedAt: new Date(),
-      mustChangePassword: true,
+      mustChangePassword: false,
       profile: {
         create: { displayName: name, organization, district, publicProfile: roleCode === 'INNOVATOR' }
       }

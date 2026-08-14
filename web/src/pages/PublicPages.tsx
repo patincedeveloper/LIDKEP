@@ -1,112 +1,1891 @@
-import { useMemo, useState } from 'react';
-import styled from '@emotion/styled';
-import { ArrowLeft, ArrowRight, BarChart3, Bookmark, Building2, CheckCircle2, Compass, Eye, FileText, Filter, HeartHandshake, Leaf, MapPin, Search, Share2, ShieldCheck, Sparkles, TrendingUp, Users } from 'lucide-react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { usePlatform } from '../api';
-import { palette } from '../styles';
-import type { Innovation, Role } from '../types';
-import { Brand, Button, ButtonLink, EmptyState, Eyebrow, Field, FormGrid, Input, PageHeader, Panel, PanelBody, PanelHeader, Select, StatCard, StatGrid, StatusBadge, Textarea } from '../ui';
+import { useMemo, useState } from "react";
+import styled from "@emotion/styled";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BarChart3,
+  Bookmark,
+  Building2,
+  CheckCircle2,
+  Compass,
+  Eye,
+  FileText,
+  Filter,
+  HeartHandshake,
+  Leaf,
+  MapPin,
+  Search,
+  Share2,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { usePlatform } from "../api";
+import { palette } from "../styles";
+import type { Innovation, Role } from "../types";
+import {
+  Brand,
+  Button,
+  ButtonLink,
+  EmptyState,
+  Eyebrow,
+  Field,
+  FormGrid,
+  Input,
+  PageHeader,
+  Panel,
+  PanelBody,
+  PanelHeader,
+  Select,
+  StatCard,
+  StatGrid,
+  StatusBadge,
+  Textarea,
+} from "../ui";
 
 export function PublicHeader() {
-  return <><Announcement>Rwanda's trusted innovation knowledge exchange <Link to="/discover">Explore published work <ArrowRight size={14}/></Link></Announcement><PublicNav><Brand/><nav><Link to="/discover">Discover</Link><Link to="/statistics">Statistics</Link><Link to="/about">How it works</Link></nav><div><ButtonLink to="/login" $variant="quiet">Sign in</ButtonLink><ButtonLink to="/register">Share an innovation <ArrowRight size={16}/></ButtonLink></div></PublicNav></>;
+  return (
+    <>
+      <Announcement>
+        Rwanda's trusted innovation knowledge exchange{" "}
+        <Link to="/discover">
+          Explore published work <ArrowRight size={14} />
+        </Link>
+      </Announcement>
+      <PublicNav>
+        <Brand />
+        <nav>
+          <Link to="/discover">Discover</Link>
+          <Link to="/statistics">Statistics</Link>
+          <Link to="/about">How it works</Link>
+        </nav>
+        <div>
+          <ButtonLink to="/login" $variant="quiet">
+            Sign in
+          </ButtonLink>
+          <ButtonLink to="/register">
+            Share an innovation <ArrowRight size={16} />
+          </ButtonLink>
+        </div>
+      </PublicNav>
+    </>
+  );
 }
 
 export function HomePage() {
   const { data } = usePlatform();
-  const published = data!.innovations.filter((item) => item.status === 'PUBLISHED').slice(0,3);
-  return <><PublicHeader/><main><Hero><HeroCopy><Eyebrow><Sparkles size={15}/> Rwanda's innovation ecosystem</Eyebrow><h1>Local ideas. <em>Lasting</em> impact.</h1><p>A trusted home for the people and ideas shaping Rwanda's future - discover reviewed work, connect responsibly, and grow what matters.</p><HeroActions><ButtonLink to="/discover">Explore innovations <ArrowRight size={17}/></ButtonLink><ButtonLink to="/register" $variant="secondary">Create an account</ButtonLink></HeroActions><Trust><ShieldCheck size={19}/><span>Published innovations reference reviewed, immutable versions.</span></Trust></HeroCopy><HeroVisual><HeroTag>Innovation platform</HeroTag><h2>Build local solutions<br/>with trusted support.</h2><p>Rwanda · Secure collaboration</p><HeroJourney><span><Leaf size={22}/></span><div><b>From a local problem</b><small>to a solution with national reach</small></div><ArrowRight/></HeroJourney></HeroVisual></Hero><ImpactBand>{[[data!.statistics.publishedInnovations,'published innovations'],[data!.statistics.districtsReached,'districts represented'],[data!.statistics.activeExperts,'verified experts'],[data!.statistics.collaborationRequests,'connections enabled']].map(([value,label])=><div key={label}><strong>{value}</strong><span>{label}</span></div>)}</ImpactBand><Section><SectionTop><div><Eyebrow><Compass size={15}/> From the registry</Eyebrow><h2>Innovation worth knowing about.</h2></div><ButtonLink to="/discover" $variant="secondary">View all <ArrowRight size={16}/></ButtonLink></SectionTop>{published.length?<InnovationGrid>{published.map((item,index)=><InnovationCard key={item.id} item={item} index={index}/>)}</InnovationGrid>:<EmptyState title="The public registry is ready" copy="Published innovations will appear here after review and administrator approval."/>}</Section><RoleBand><div><Eyebrow>One trusted platform</Eyebrow><h2>Built for every part of the ecosystem.</h2><p>Structured journeys keep ownership, evaluation, publication, and engagement responsibilities clear.</p></div><RoleGrid>{[['Innovators','Document, improve and track local work.'],['Experts','Review evidence with transparent criteria.'],['Partners','Discover and engage responsibly.'],['Public users','Learn from approved public knowledge.']].map(([title,copy],i)=><article key={title}><span>0{i+1}</span><h3>{title}</h3><p>{copy}</p></article>)}</RoleGrid></RoleBand></main><PublicFooter/></>;
+  const published = data!.innovations
+    .filter((item) => item.status === "PUBLISHED")
+    .slice(0, 3);
+  return (
+    <>
+      <PublicHeader />
+      <main>
+        <Hero>
+          <HeroCopy>
+            <Eyebrow>
+              <Sparkles size={15} /> Rwanda's innovation ecosystem
+            </Eyebrow>
+            <h1>
+              Local ideas. <em>Lasting</em> impact.
+            </h1>
+            <p>
+              A trusted home for the people and ideas shaping Rwanda's future -
+              discover reviewed work, connect responsibly, and grow what
+              matters.
+            </p>
+            <HeroActions>
+              <ButtonLink to="/discover">
+                Explore innovations <ArrowRight size={17} />
+              </ButtonLink>
+              <ButtonLink to="/register" $variant="secondary">
+                Create an account
+              </ButtonLink>
+            </HeroActions>
+            <Trust>
+              <ShieldCheck size={19} />
+              <span>
+                Published innovations reference reviewed, immutable versions.
+              </span>
+            </Trust>
+          </HeroCopy>
+          <HeroVisual>
+            <HeroTag>Innovation platform</HeroTag>
+            <h2>
+              Build local solutions
+              <br />
+              with trusted support.
+            </h2>
+            <p>Rwanda · Secure collaboration</p>
+            <HeroJourney>
+              <span>
+                <Leaf size={22} />
+              </span>
+              <div>
+                <b>From a local problem</b>
+                <small>to a solution with national reach</small>
+              </div>
+              <ArrowRight />
+            </HeroJourney>
+          </HeroVisual>
+        </Hero>
+        <ImpactBand>
+          {[
+            [data!.statistics.publishedInnovations, "published innovations"],
+            [data!.statistics.districtsReached, "districts represented"],
+            [data!.statistics.activeExperts, "verified experts"],
+            [data!.statistics.collaborationRequests, "connections enabled"],
+          ].map(([value, label]) => (
+            <div key={label}>
+              <strong>{value}</strong>
+              <span>{label}</span>
+            </div>
+          ))}
+        </ImpactBand>
+        <Section>
+          <SectionTop>
+            <div>
+              <Eyebrow>
+                <Compass size={15} /> From the registry
+              </Eyebrow>
+              <h2>Innovation worth knowing about.</h2>
+            </div>
+            <ButtonLink to="/discover" $variant="secondary">
+              View all <ArrowRight size={16} />
+            </ButtonLink>
+          </SectionTop>
+          {published.length ? (
+            <InnovationGrid>
+              {published.map((item, index) => (
+                <InnovationCard key={item.id} item={item} index={index} />
+              ))}
+            </InnovationGrid>
+          ) : (
+            <EmptyState
+              title="The public registry is ready"
+              copy="Published innovations will appear here after review and administrator approval."
+            />
+          )}
+        </Section>
+        <RoleBand>
+          <div>
+            <Eyebrow>One trusted platform</Eyebrow>
+            <h2>Built for every part of the ecosystem.</h2>
+            <p>
+              Structured journeys keep ownership, evaluation, publication, and
+              engagement responsibilities clear.
+            </p>
+          </div>
+          <RoleGrid>
+            {[
+              ["Innovators", "Document, improve and track local work."],
+              ["Experts", "Review evidence with transparent criteria."],
+              ["Partners", "Discover and engage responsibly."],
+              ["Public users", "Learn from approved public knowledge."],
+            ].map(([title, copy], i) => (
+              <article key={title}>
+                <span>0{i + 1}</span>
+                <h3>{title}</h3>
+                <p>{copy}</p>
+              </article>
+            ))}
+          </RoleGrid>
+        </RoleBand>
+      </main>
+      <PublicFooter />
+    </>
+  );
 }
 
-export function InnovationCard({item,index=0}:{item:Innovation;index?:number}) {
-  return <Card><CardArt $tone={item.imageTone}><StatusBadge status={item.status}/><b>0{index+1}</b></CardArt><CardBody><CardMeta><span>{item.sector}</span><span><MapPin size={13}/>{item.district}</span></CardMeta><h3><Link to={`/innovations/${item.slug}`}>{item.title}</Link></h3><p>{item.summary}</p><CardFoot><div><small>Led by</small><strong>{item.owner}</strong></div><Link aria-label={`Open ${item.title}`} to={`/innovations/${item.slug}`}><ArrowRight size={17}/></Link></CardFoot></CardBody></Card>;
+export function InnovationCard({
+  item,
+  index = 0,
+}: {
+  item: Innovation;
+  index?: number;
+}) {
+  return (
+    <Card>
+      <CardArt $tone={item.imageTone}>
+        <StatusBadge status={item.status} />
+        <b>0{index + 1}</b>
+      </CardArt>
+      <CardBody>
+        <CardMeta>
+          <span>{item.sector}</span>
+          <span>
+            <MapPin size={13} />
+            {item.district}
+          </span>
+        </CardMeta>
+        <h3>
+          <Link to={`/innovations/${item.slug}`}>{item.title}</Link>
+        </h3>
+        <p>{item.summary}</p>
+        <CardFoot>
+          <div>
+            <small>Led by</small>
+            <strong>{item.owner}</strong>
+          </div>
+          <Link
+            aria-label={`Open ${item.title}`}
+            to={`/innovations/${item.slug}`}
+          >
+            <ArrowRight size={17} />
+          </Link>
+        </CardFoot>
+      </CardBody>
+    </Card>
+  );
 }
 
 export function DirectoryPage() {
-  const { data } = usePlatform(); const [query,setQuery]=useState(''); const [sector,setSector]=useState(''); const [district,setDistrict]=useState(''); const [maturity,setMaturity]=useState('');
-  const published=useMemo(()=>data!.innovations.filter(i=>i.status==='PUBLISHED'&&(!query||`${i.title} ${i.summary} ${i.problem} ${i.solution}`.toLowerCase().includes(query.toLowerCase()))&&(!sector||i.sector===sector)&&(!district||i.district===district)&&(!maturity||i.maturity===maturity)),[data,query,sector,district,maturity]);
-  const clear=()=>{setQuery('');setSector('');setDistrict('');setMaturity('')};
-  return <><PublicHeader/><PageSurface><PageHeader eyebrow="Public registry" title="Discover local innovation" description="Search approved, published innovation knowledge. Restricted fields and files never appear in this public view."/><FilterPanel><SearchField><Search size={19}/><Input aria-label="Search innovations" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search problems, ideas or solutions"/></SearchField><Select aria-label="Sector filter" value={sector} onChange={e=>setSector(e.target.value)}><option value="">All sectors</option>{data!.taxonomies.sectors.map(v=><option key={v}>{v}</option>)}</Select><Select aria-label="District filter" value={district} onChange={e=>setDistrict(e.target.value)}><option value="">All districts</option>{data!.taxonomies.districts.map(v=><option key={v}>{v}</option>)}</Select><Select aria-label="Maturity filter" value={maturity} onChange={e=>setMaturity(e.target.value)}><option value="">All maturity levels</option>{data!.taxonomies.maturityLevels.map(v=><option key={v}>{v}</option>)}</Select><Button $variant="quiet" onClick={clear}><Filter size={16}/> Reset</Button></FilterPanel><ResultLine><strong>{published.length} innovations</strong><span>Published and approved for public discovery</span></ResultLine>{published.length?<InnovationGrid>{published.map((item,index)=><InnovationCard key={item.id} item={item} index={index}/>)}</InnovationGrid>:<EmptyState title="No innovation matches those filters" copy="Try a broader keyword, another district, or reset all filters." action={<Button onClick={clear}>Reset filters</Button>}/>}</PageSurface><PublicFooter/></>;
+  const { data } = usePlatform();
+  const [query, setQuery] = useState("");
+  const [sector, setSector] = useState("");
+  const [district, setDistrict] = useState("");
+  const [maturity, setMaturity] = useState("");
+  const published = useMemo(
+    () =>
+      data!.innovations.filter(
+        (i) =>
+          i.status === "PUBLISHED" &&
+          (!query ||
+            `${i.title} ${i.summary} ${i.problem} ${i.solution}`
+              .toLowerCase()
+              .includes(query.toLowerCase())) &&
+          (!sector || i.sector === sector) &&
+          (!district || i.district === district) &&
+          (!maturity || i.maturity === maturity),
+      ),
+    [data, query, sector, district, maturity],
+  );
+  const clear = () => {
+    setQuery("");
+    setSector("");
+    setDistrict("");
+    setMaturity("");
+  };
+  return (
+    <>
+      <PublicHeader />
+      <PageSurface>
+        <PageHeader
+          eyebrow="Public registry"
+          title="Discover local innovation"
+          description="Search approved, published innovation knowledge. Restricted fields and files never appear in this public view."
+        />
+        <FilterPanel>
+          <SearchField>
+            <Search size={19} />
+            <Input
+              aria-label="Search innovations"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search problems, ideas or solutions"
+            />
+          </SearchField>
+          <Select
+            aria-label="Sector filter"
+            value={sector}
+            onChange={(e) => setSector(e.target.value)}
+          >
+            <option value="">All sectors</option>
+            {data!.taxonomies.sectors.map((v) => (
+              <option key={v}>{v}</option>
+            ))}
+          </Select>
+          <Select
+            aria-label="District filter"
+            value={district}
+            onChange={(e) => setDistrict(e.target.value)}
+          >
+            <option value="">All districts</option>
+            {data!.taxonomies.districts.map((v) => (
+              <option key={v}>{v}</option>
+            ))}
+          </Select>
+          <Select
+            aria-label="Maturity filter"
+            value={maturity}
+            onChange={(e) => setMaturity(e.target.value)}
+          >
+            <option value="">All maturity levels</option>
+            {data!.taxonomies.maturityLevels.map((v) => (
+              <option key={v}>{v}</option>
+            ))}
+          </Select>
+          <Button $variant="quiet" onClick={clear}>
+            <Filter size={16} /> Reset
+          </Button>
+        </FilterPanel>
+        <ResultLine>
+          <strong>{published.length} innovations</strong>
+          <span>Published and approved for public discovery</span>
+        </ResultLine>
+        {published.length ? (
+          <InnovationGrid>
+            {published.map((item, index) => (
+              <InnovationCard key={item.id} item={item} index={index} />
+            ))}
+          </InnovationGrid>
+        ) : (
+          <EmptyState
+            title="No innovation matches those filters"
+            copy="Try a broader keyword, another district, or reset all filters."
+            action={<Button onClick={clear}>Reset filters</Button>}
+          />
+        )}
+      </PageSurface>
+      <PublicFooter />
+    </>
+  );
 }
 
 export function InnovationDetailPage() {
-  const { slug }=useParams(); const {data,notify}=usePlatform(); const item=data!.innovations.find(i=>i.slug===slug&&i.status==='PUBLISHED');
-  if(!item)return <SystemStatePage code="404" title="Innovation not found" copy="This public innovation does not exist, is unpublished, or has been archived."/>;
-  return <><PublicHeader/><DetailHero $tone={item.imageTone}><DetailHeroInner><ButtonLink to="/discover" $variant="quiet"><ArrowLeft size={16}/> Back to discovery</ButtonLink><div><StatusBadge status={item.status}/><span>{item.sector}</span><span><MapPin size={14}/>{item.district}</span></div><h1>{item.title}</h1><p>{item.summary}</p><DetailActions><Button onClick={()=>notify('Innovation saved to your opportunities')}><Bookmark size={17}/> Save opportunity</Button><Button $variant="secondary" onClick={()=>{navigator.clipboard?.writeText(location.href);notify('Share link copied')}}><Share2 size={17}/> Share</Button></DetailActions></DetailHeroInner></DetailHero><PageSurface><DetailGrid><article><ContentSection><Eyebrow>The local challenge</Eyebrow><h2>Problem</h2><p>{item.problem}</p></ContentSection><ContentSection><Eyebrow>The innovation</Eyebrow><h2>Solution</h2><p>{item.solution}</p></ContentSection><ContentSection><Eyebrow>Who benefits</Eyebrow><h2>Beneficiaries</h2><p>{item.beneficiaries}</p></ContentSection><ContentSection><Eyebrow>Evidence and progress</Eyebrow><h2>Documented milestones</h2><Timeline>{item.milestones.map(m=><div key={m.title}><CheckCircle2 size={18}/><span><strong>{m.title}</strong><small>{m.date}</small></span><StatusBadge status={m.status}/></div>)}</Timeline></ContentSection></article><aside><Panel><PanelHeader><h3>Innovation snapshot</h3></PanelHeader><PanelBody><SnapshotList>{[['Maturity',item.maturity],['Impact area',item.impact],['Support needed',item.supportNeeded],['Published version',`Version ${item.version}`]].map(([a,b])=><div key={a}><span>{a}</span><strong>{b}</strong></div>)}</SnapshotList></PanelBody></Panel><Panel><PanelHeader><h3>Verified impact signals</h3></PanelHeader><PanelBody><MetricStack>{item.metrics.map(m=><div key={m.label}><strong>{m.value}</strong><span>{m.label}</span></div>)}</MetricStack></PanelBody></Panel><Panel><PanelHeader><h3>About the innovator</h3></PanelHeader><PanelBody><Owner><span>{item.owner.split(' ').map(v=>v[0]).join('').slice(0,2)}</span><div><strong>{item.owner}</strong><small>{item.organization}</small></div></Owner></PanelBody></Panel><Notice><ShieldCheck size={18}/><p>Publication on LIDKEP is not patent protection or investment advice. Engagement offers are non-binding and funds are never transferred on the platform.</p></Notice></aside></DetailGrid></PageSurface><PublicFooter/></>;
+  const { slug } = useParams();
+  const { data, notify } = usePlatform();
+  const item = data!.innovations.find(
+    (i) => i.slug === slug && i.status === "PUBLISHED",
+  );
+  if (!item)
+    return (
+      <SystemStatePage
+        code="404"
+        title="Innovation not found"
+        copy="This public innovation does not exist, is unpublished, or has been archived."
+      />
+    );
+  return (
+    <>
+      <PublicHeader />
+      <DetailHero $tone={item.imageTone}>
+        <DetailHeroInner>
+          <ButtonLink to="/discover" $variant="quiet">
+            <ArrowLeft size={16} /> Back to discovery
+          </ButtonLink>
+          <div>
+            <StatusBadge status={item.status} />
+            <span>{item.sector}</span>
+            <span>
+              <MapPin size={14} />
+              {item.district}
+            </span>
+          </div>
+          <h1>{item.title}</h1>
+          <p>{item.summary}</p>
+          <DetailActions>
+            <Button
+              onClick={() => notify("Innovation saved to your opportunities")}
+            >
+              <Bookmark size={17} /> Save opportunity
+            </Button>
+            <Button
+              $variant="secondary"
+              onClick={() => {
+                navigator.clipboard?.writeText(location.href);
+                notify("Share link copied");
+              }}
+            >
+              <Share2 size={17} /> Share
+            </Button>
+          </DetailActions>
+        </DetailHeroInner>
+      </DetailHero>
+      <PageSurface>
+        <DetailGrid>
+          <article>
+            <ContentSection>
+              <Eyebrow>The local challenge</Eyebrow>
+              <h2>Problem</h2>
+              <p>{item.problem}</p>
+            </ContentSection>
+            <ContentSection>
+              <Eyebrow>The innovation</Eyebrow>
+              <h2>Solution</h2>
+              <p>{item.solution}</p>
+            </ContentSection>
+            <ContentSection>
+              <Eyebrow>Who benefits</Eyebrow>
+              <h2>Beneficiaries</h2>
+              <p>{item.beneficiaries}</p>
+            </ContentSection>
+            <ContentSection>
+              <Eyebrow>Evidence and progress</Eyebrow>
+              <h2>Documented milestones</h2>
+              <Timeline>
+                {item.milestones.map((m) => (
+                  <div key={m.title}>
+                    <CheckCircle2 size={18} />
+                    <span>
+                      <strong>{m.title}</strong>
+                      <small>{m.date}</small>
+                    </span>
+                    <StatusBadge status={m.status} />
+                  </div>
+                ))}
+              </Timeline>
+            </ContentSection>
+          </article>
+          <aside>
+            <Panel>
+              <PanelHeader>
+                <h3>Innovation snapshot</h3>
+              </PanelHeader>
+              <PanelBody>
+                <SnapshotList>
+                  {[
+                    ["Maturity", item.maturity],
+                    ["Impact area", item.impact],
+                    ["Support needed", item.supportNeeded],
+                    ["Published version", `Version ${item.version}`],
+                  ].map(([a, b]) => (
+                    <div key={a}>
+                      <span>{a}</span>
+                      <strong>{b}</strong>
+                    </div>
+                  ))}
+                </SnapshotList>
+              </PanelBody>
+            </Panel>
+            <Panel>
+              <PanelHeader>
+                <h3>Verified impact signals</h3>
+              </PanelHeader>
+              <PanelBody>
+                <MetricStack>
+                  {item.metrics.map((m) => (
+                    <div key={m.label}>
+                      <strong>{m.value}</strong>
+                      <span>{m.label}</span>
+                    </div>
+                  ))}
+                </MetricStack>
+              </PanelBody>
+            </Panel>
+            <Panel>
+              <PanelHeader>
+                <h3>About the innovator</h3>
+              </PanelHeader>
+              <PanelBody>
+                <Owner>
+                  <span>
+                    {item.owner
+                      .split(" ")
+                      .map((v) => v[0])
+                      .join("")
+                      .slice(0, 2)}
+                  </span>
+                  <div>
+                    <strong>{item.owner}</strong>
+                    <small>{item.organization}</small>
+                  </div>
+                </Owner>
+              </PanelBody>
+            </Panel>
+            <Notice>
+              <ShieldCheck size={18} />
+              <p>
+                Publication on LIDKEP is not patent protection or investment
+                advice. Engagement offers are non-binding and funds are never
+                transferred on the platform.
+              </p>
+            </Notice>
+          </aside>
+        </DetailGrid>
+      </PageSurface>
+      <PublicFooter />
+    </>
+  );
 }
 
-export function StatisticsPage(){
-  const {data}=usePlatform(); const stats=data!.statistics; const max=Math.max(...stats.monthlySubmissions);
-  return <><PublicHeader/><PageSurface><PageHeader eyebrow="Approved public data" title="Innovation ecosystem statistics" description="Aggregates include published records only and exclude private, restricted, or unpublished data."/><StatGrid><StatCard label="Published innovations" value={stats.publishedInnovations} icon={<Leaf size={18}/>}/><StatCard label="Districts represented" value={stats.districtsReached} icon={<MapPin size={18}/>}/><StatCard label="Verified experts" value={stats.activeExperts} icon={<Users size={18}/>}/><StatCard label="Collaboration requests" value={stats.collaborationRequests} icon={<HeartHandshake size={18}/>}/></StatGrid><StatsGrid><Panel><PanelHeader><div><h2>Publication activity</h2><p>Approved innovations published over six months</p></div></PanelHeader><PanelBody><BarChart aria-label="Monthly publication bar chart">{stats.monthlySubmissions.map((value,i)=><div key={i}><span style={{height:`${(value/max)*100}%`}}/><small>{['Feb','Mar','Apr','May','Jun','Jul'][i]}</small></div>)}</BarChart></PanelBody></Panel><Panel><PanelHeader><div><h2>Distribution by sector</h2><p>Share of published registry</p></div></PanelHeader><PanelBody><SectorList>{stats.sectorDistribution.map(s=><div key={s.label}><span><b>{s.label}</b><small>{s.value}%</small></span><div><i style={{width:`${s.value}%`}}/></div></div>)}</SectorList></PanelBody></Panel></StatsGrid></PageSurface><PublicFooter/></>;
+export function StatisticsPage() {
+  const { data } = usePlatform();
+  const stats = data!.statistics;
+  const max = Math.max(...stats.monthlySubmissions);
+  return (
+    <>
+      <PublicHeader />
+      <PageSurface>
+        <PageHeader
+          eyebrow="Approved public data"
+          title="Innovation ecosystem statistics"
+          description="Aggregates include published records only and exclude private, restricted, or unpublished data."
+        />
+        <StatGrid>
+          <StatCard
+            label="Published innovations"
+            value={stats.publishedInnovations}
+            icon={<Leaf size={18} />}
+          />
+          <StatCard
+            label="Districts represented"
+            value={stats.districtsReached}
+            icon={<MapPin size={18} />}
+          />
+          <StatCard
+            label="Verified experts"
+            value={stats.activeExperts}
+            icon={<Users size={18} />}
+          />
+          <StatCard
+            label="Collaboration requests"
+            value={stats.collaborationRequests}
+            icon={<HeartHandshake size={18} />}
+          />
+        </StatGrid>
+        <StatsGrid>
+          <Panel>
+            <PanelHeader>
+              <div>
+                <h2>Publication activity</h2>
+                <p>Approved innovations published over six months</p>
+              </div>
+            </PanelHeader>
+            <PanelBody>
+              <BarChart aria-label="Monthly publication bar chart">
+                {stats.monthlySubmissions.map((value, i) => (
+                  <div key={i}>
+                    <span style={{ height: `${(value / max) * 100}%` }} />
+                    <small>
+                      {["Feb", "Mar", "Apr", "May", "Jun", "Jul"][i]}
+                    </small>
+                  </div>
+                ))}
+              </BarChart>
+            </PanelBody>
+          </Panel>
+          <Panel>
+            <PanelHeader>
+              <div>
+                <h2>Distribution by sector</h2>
+                <p>Share of published registry</p>
+              </div>
+            </PanelHeader>
+            <PanelBody>
+              <SectorList>
+                {stats.sectorDistribution.map((s) => (
+                  <div key={s.label}>
+                    <span>
+                      <b>{s.label}</b>
+                      <small>{s.value}%</small>
+                    </span>
+                    <div>
+                      <i style={{ width: `${s.value}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </SectorList>
+            </PanelBody>
+          </Panel>
+        </StatsGrid>
+      </PageSurface>
+      <PublicFooter />
+    </>
+  );
 }
 
-export function AuthPage({mode}:{mode:'login'|'register'|'reset'}){
-  const navigate=useNavigate(); const {notify,login,register}=usePlatform(); const [role,setRole]=useState<Role>('INNOVATOR'); const [formError,setFormError]=useState(''); const [busy,setBusy]=useState(false);
-  const destination=(nextRole:Role)=>nextRole==='SYSTEM_ADMINISTRATOR'?'/admin/dashboard':nextRole==='INNOVATOR'?'/innovator/dashboard':nextRole==='EXPERT'?'/expert/dashboard':nextRole==='INVESTOR_PARTNER'?'/partner/dashboard':'/discover';
-  const submit=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();setFormError('');setBusy(true);const form=new FormData(e.currentTarget);try{if(mode==='reset'){notify('Password recovery will be sent when email delivery is configured.');return}if(mode==='login'){const user=await login(String(form.get('email')),String(form.get('password')));notify('Signed in securely.');navigate(user.mustChangePassword?'/change-password':destination(user.role));return}const result=await register({email:String(form.get('email')),password:String(form.get('password')),displayName:String(form.get('displayName')),organization:String(form.get('organization')||''),role:role as Exclude<Role,'SYSTEM_ADMINISTRATOR'>});if(result.requiresApproval){notify('Account created and awaiting administrator approval.');navigate('/login')}else{notify('Account created.');navigate(destination(result.user.role))}}catch(cause){setFormError(cause instanceof Error?cause.message:'The request failed.')}finally{setBusy(false)}};
-  return <AuthShell><AuthBrand><Brand/><ButtonLink to="/" $variant="quiet">Back to public site</ButtonLink></AuthBrand><AuthGrid><AuthIntro><Eyebrow>Secure participation</Eyebrow><h1>{mode==='login'?'Welcome back.':mode==='register'?'Bring your work into view.':'Recover access securely.'}</h1><p>{mode==='login'?'Sign in to continue your role-specific journey.':mode==='register'?'Create a real account. Expert and Partner accounts require administrator approval.':'Enter your verified email to request recovery.'}</p><AuthTrust><ShieldCheck/><div><b>Privacy by design</b><span>Role, account state, ownership, assignment, and visibility checks are enforced by the API.</span></div></AuthTrust></AuthIntro><Panel><PanelHeader><div><h2>{mode==='login'?'Sign in':mode==='register'?'Create an account':'Reset password'}</h2><p>Credentials are protected with Argon2id and secure server-side sessions.</p></div></PanelHeader><PanelBody><AuthForm onSubmit={submit}>{mode==='register'&&<Field label="Account type"><Select value={role} onChange={e=>setRole(e.target.value as Role)}><option value="INNOVATOR">Innovator</option><option value="EXPERT">Expert</option><option value="INVESTOR_PARTNER">Investor / Industry Partner</option><option value="PUBLIC_USER">Public User</option></Select></Field>}{mode==='register'&&<><Field label="Full name"><Input name="displayName" required placeholder="Your full name"/></Field><Field label="Organization"><Input name="organization" placeholder="Organization, cooperative, or independent"/></Field></>}<Field label="Email address"><Input name="email" type="email" required placeholder="name@example.rw" autoComplete="email"/></Field>{mode!=='reset'&&<Field label="Password"><Input name="password" type="password" required minLength={12} placeholder="At least 12 characters" autoComplete={mode==='login'?'current-password':'new-password'}/></Field>}{formError&&<FormError role="alert">{formError}</FormError>}<Button type="submit" disabled={busy}>{busy?'Please wait…':mode==='login'?'Sign in':mode==='register'?'Create account':'Request reset'} <ArrowRight size={16}/></Button>{mode==='login'&&<AuthLinks><Link to="/forgot-password">Forgot password?</Link><Link to="/register">Create account</Link></AuthLinks>}</AuthForm></PanelBody></Panel></AuthGrid></AuthShell>;
+export function AuthPage({ mode }: { mode: "login" | "register" | "reset" }) {
+  const navigate = useNavigate();
+  const { notify, login, register } = usePlatform();
+  const [role, setRole] = useState<Role>("INNOVATOR");
+  const [formError, setFormError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const destination = (nextRole: Role) =>
+    nextRole === "SYSTEM_ADMINISTRATOR"
+      ? "/admin/dashboard"
+      : nextRole === "INNOVATOR"
+        ? "/innovator/dashboard"
+        : nextRole === "EXPERT"
+          ? "/expert/dashboard"
+          : nextRole === "INVESTOR_PARTNER"
+            ? "/partner/dashboard"
+            : "/discover";
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setFormError("");
+    setBusy(true);
+    const form = new FormData(e.currentTarget);
+    try {
+      if (mode === "reset") {
+        notify(
+          "Password recovery will be sent when email delivery is configured.",
+        );
+        return;
+      }
+      if (mode === "login") {
+        const user = await login(
+          String(form.get("email")),
+          String(form.get("password")),
+        );
+        notify("Signed in securely.");
+        navigate(destination(user.role));
+        return;
+      }
+      const result = await register({
+        email: String(form.get("email")),
+        password: String(form.get("password")),
+        displayName: String(form.get("displayName")),
+        role: role as Exclude<Role, "SYSTEM_ADMINISTRATOR">,
+      });
+      if (result.requiresApproval) {
+        notify("Account created. Complete your profile to request approval.");
+        navigate(destination(result.user.role));
+      } else {
+        notify("Account created.");
+        navigate(destination(result.user.role));
+      }
+    } catch (cause) {
+      setFormError(
+        cause instanceof Error ? cause.message : "The request failed.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <AuthShell>
+      <AuthBrand>
+        <Brand />
+        <ButtonLink to="/" $variant="quiet">
+          Back to public site
+        </ButtonLink>
+      </AuthBrand>
+      <AuthGrid>
+        <AuthIntro>
+          <Eyebrow>Secure participation</Eyebrow>
+          <h1>
+            {mode === "login"
+              ? "Welcome back."
+              : mode === "register"
+                ? "Choose how you participate."
+                : "Recover access securely."}
+          </h1>
+          <p>
+            {mode === "login"
+              ? "Sign in to continue your role-specific journey."
+              : mode === "register"
+                ? "Register as an Innovator, Expert, or Investor / Industry Partner. Every new account requires System Administrator approval."
+                : "Enter your verified email to request recovery."}
+          </p>
+          <AuthTrust>
+            <ShieldCheck />
+            <div>
+              <b>Clear role responsibilities</b>
+              <span>
+                Your selected role controls the workspace and information you
+                can access.
+              </span>
+            </div>
+          </AuthTrust>
+        </AuthIntro>
+        <Panel>
+          <PanelHeader>
+            <div>
+              <h2>
+                {mode === "login"
+                  ? "Sign in"
+                  : mode === "register"
+                    ? "Create an account"
+                    : "Reset password"}
+              </h2>
+              <p>
+                Credentials are protected with Argon2id and secure server-side
+                sessions.
+              </p>
+            </div>
+          </PanelHeader>
+          <PanelBody>
+            <AuthForm onSubmit={submit}>
+              {mode === "register" && (
+                <fieldset>
+                  <legend>Choose your account type</legend>
+                  <RoleChoices>
+                    {(
+                      [
+                        [
+                          "INNOVATOR",
+                          "Innovator",
+                          "Submit innovations and track progress.",
+                        ],
+                        ["EXPERT", "Expert", "Review submitted innovations."],
+                        [
+                          "INVESTOR_PARTNER",
+                          "Investor / Industry Partner",
+                          "Discover and support innovations.",
+                        ],
+                      ] as const
+                    ).map(([value, label, copy]) => (
+                      <label
+                        key={value}
+                        className={role === value ? "selected" : ""}
+                      >
+                        <input
+                          type="radio"
+                          name="roleChoice"
+                          value={value}
+                          checked={role === value}
+                          onChange={() => setRole(value)}
+                        />
+                        <span>
+                          <b>{label}</b>
+                          <small>{copy}</small>
+                        </span>
+                      </label>
+                    ))}
+                  </RoleChoices>
+                </fieldset>
+              )}
+              {mode === "register" && (
+                <Field label="Full name">
+                  <Input
+                    name="displayName"
+                    required
+                    placeholder="Enter your names as shown on your identification"
+                    autoComplete="name"
+                  />
+                </Field>
+              )}
+              <Field label="Email address">
+                <Input
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="name@example.rw"
+                  autoComplete="email"
+                />
+              </Field>
+              {mode !== "reset" && (
+                <Field label="Password">
+                  <Input
+                    name="password"
+                    type="password"
+                    required
+                    minLength={12}
+                    placeholder="At least 12 characters"
+                    autoComplete={
+                      mode === "login" ? "current-password" : "new-password"
+                    }
+                  />
+                </Field>
+              )}
+              {formError && <FormError role="alert">{formError}</FormError>}
+              <Button type="submit" disabled={busy}>
+                {busy
+                  ? "Please wait…"
+                  : mode === "login"
+                    ? "Sign in"
+                    : mode === "register"
+                      ? "Create account"
+                      : "Request reset"}{" "}
+                <ArrowRight size={16} />
+              </Button>
+              {mode === "login" && (
+                <AuthLinks>
+                  <Link to="/forgot-password">Forgot password?</Link>
+                  <Link to="/register">Create account</Link>
+                </AuthLinks>
+              )}
+            </AuthForm>
+          </PanelBody>
+        </Panel>
+      </AuthGrid>
+    </AuthShell>
+  );
 }
 
-export function ChangePasswordPage(){
-  const navigate=useNavigate(); const {user,changePassword,notify}=usePlatform(); const [formError,setFormError]=useState(''); const [busy,setBusy]=useState(false);
-  if(!user)return <Navigate to="/login" replace/>;
-  const submit=async(e:React.FormEvent<HTMLFormElement>)=>{e.preventDefault();setFormError('');const form=new FormData(e.currentTarget);const currentPassword=String(form.get('currentPassword'));const newPassword=String(form.get('newPassword'));if(newPassword!==String(form.get('confirmPassword'))){setFormError('The new passwords do not match.');return}setBusy(true);try{await changePassword(currentPassword,newPassword);notify('Password changed. Sign in with your new password.');navigate('/login')}catch(cause){setFormError(cause instanceof Error?cause.message:'The request failed.')}finally{setBusy(false)}};
-  return <AuthShell><AuthBrand><Brand/><span>Required security step</span></AuthBrand><AuthGrid><AuthIntro><Eyebrow>Protect your account</Eyebrow><h1>Choose your own password.</h1><p>The initial credential is temporary. Set a new strong password before entering the workspace.</p><AuthTrust><ShieldCheck/><div><b>All sessions are revoked</b><span>After this change, sign in again with your new password.</span></div></AuthTrust></AuthIntro><Panel><PanelHeader><div><h2>Change password</h2><p>Use at least 12 characters with upper and lower case letters, a number, and a symbol.</p></div></PanelHeader><PanelBody><AuthForm onSubmit={submit}><Field label="Current password"><Input name="currentPassword" type="password" required autoComplete="current-password"/></Field><Field label="New password"><Input name="newPassword" type="password" required minLength={12} autoComplete="new-password"/></Field><Field label="Confirm new password"><Input name="confirmPassword" type="password" required minLength={12} autoComplete="new-password"/></Field>{formError&&<FormError role="alert">{formError}</FormError>}<Button type="submit" disabled={busy}>{busy?'Please wait…':'Change password'} <ArrowRight size={16}/></Button></AuthForm></PanelBody></Panel></AuthGrid></AuthShell>;
+export function ChangePasswordPage() {
+  const navigate = useNavigate();
+  const { user, changePassword, notify } = usePlatform();
+  const [formError, setFormError] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (!user) return <Navigate to="/login" replace />;
+  if (!user.mustChangePassword) {
+    const workspace =
+      user.role === "SYSTEM_ADMINISTRATOR"
+        ? "admin"
+        : user.role === "INNOVATOR"
+          ? "innovator"
+          : user.role === "EXPERT"
+            ? "expert"
+            : "partner";
+    return <Navigate to={`/${workspace}/dashboard`} replace />;
+  }
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setFormError("");
+    const form = new FormData(e.currentTarget);
+    const currentPassword = String(form.get("currentPassword"));
+    const newPassword = String(form.get("newPassword"));
+    if (newPassword !== String(form.get("confirmPassword"))) {
+      setFormError("The new passwords do not match.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      notify("Password changed. Sign in with your new password.");
+      navigate("/login");
+    } catch (cause) {
+      setFormError(
+        cause instanceof Error ? cause.message : "The request failed.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <AuthShell>
+      <AuthBrand>
+        <Brand />
+        <span>Required security step</span>
+      </AuthBrand>
+      <AuthGrid>
+        <AuthIntro>
+          <Eyebrow>Protect your account</Eyebrow>
+          <h1>Choose your own password.</h1>
+          <p>
+            The initial credential is temporary. Set a new strong password
+            before entering the workspace.
+          </p>
+          <AuthTrust>
+            <ShieldCheck />
+            <div>
+              <b>All sessions are revoked</b>
+              <span>
+                After this change, sign in again with your new password.
+              </span>
+            </div>
+          </AuthTrust>
+        </AuthIntro>
+        <Panel>
+          <PanelHeader>
+            <div>
+              <h2>Change password</h2>
+              <p>
+                Use at least 12 characters with upper and lower case letters, a
+                number, and a symbol.
+              </p>
+            </div>
+          </PanelHeader>
+          <PanelBody>
+            <AuthForm onSubmit={submit}>
+              <Field label="Current password">
+                <Input
+                  name="currentPassword"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                />
+              </Field>
+              <Field label="New password">
+                <Input
+                  name="newPassword"
+                  type="password"
+                  required
+                  minLength={12}
+                  autoComplete="new-password"
+                />
+              </Field>
+              <Field label="Confirm new password">
+                <Input
+                  name="confirmPassword"
+                  type="password"
+                  required
+                  minLength={12}
+                  autoComplete="new-password"
+                />
+              </Field>
+              {formError && <FormError role="alert">{formError}</FormError>}
+              <Button type="submit" disabled={busy}>
+                {busy ? "Please wait…" : "Change password"}{" "}
+                <ArrowRight size={16} />
+              </Button>
+            </AuthForm>
+          </PanelBody>
+        </Panel>
+      </AuthGrid>
+    </AuthShell>
+  );
 }
 
-export function AboutPage(){return <><PublicHeader/><PageSurface><PageHeader eyebrow="How LIDKEP works" title="A clear path from idea to trusted knowledge" description="Each actor has a distinct responsibility. The Expert evaluates, the Administrator publishes, the Innovator owns the record, and Partners create tracked opportunities."/><ProcessGrid>{[['01','Document','Innovators structure the problem, solution, evidence, visibility, ownership and support needs.'],['02','Evaluate','Assigned verified Experts screen, score, comment and recommend against a versioned criteria set.'],['03','Decide','System Administrators approve, return, reject, publish or archive through audited transitions.'],['04','Discover','The public sees only selected fields and files from the approved immutable version.'],['05','Engage','Verified Partners send non-binding contact, funding or partnership requests with consent controls.']].map(([n,t,c])=><Panel key={n}><PanelBody><Eyebrow>{n}</Eyebrow><h2>{t}</h2><p>{c}</p></PanelBody></Panel>)}</ProcessGrid></PageSurface><PublicFooter/></>}
+export function AboutPage() {
+  return (
+    <>
+      <PublicHeader />
+      <PageSurface>
+        <PageHeader
+          eyebrow="How LIDKEP works"
+          title="A clear path from idea to trusted knowledge"
+          description="Each actor has a distinct responsibility. The Expert evaluates, the Administrator publishes, the Innovator owns the record, and Partners create tracked opportunities."
+        />
+        <ProcessGrid>
+          {[
+            [
+              "01",
+              "Document",
+              "Innovators structure the problem, solution, evidence, visibility, ownership and support needs.",
+            ],
+            [
+              "02",
+              "Evaluate",
+              "Assigned verified Experts screen, score, comment and recommend against a versioned criteria set.",
+            ],
+            [
+              "03",
+              "Decide",
+              "System Administrators approve, return, reject, publish or archive through controlled transitions.",
+            ],
+            [
+              "04",
+              "Discover",
+              "The public sees only selected fields and files from the approved immutable version.",
+            ],
+            [
+              "05",
+              "Engage",
+              "Verified Partners send non-binding contact, funding or partnership requests with consent controls.",
+            ],
+          ].map(([n, t, c]) => (
+            <Panel key={n}>
+              <PanelBody>
+                <Eyebrow>{n}</Eyebrow>
+                <h2>{t}</h2>
+                <p>{c}</p>
+              </PanelBody>
+            </Panel>
+          ))}
+        </ProcessGrid>
+      </PageSurface>
+      <PublicFooter />
+    </>
+  );
+}
 
-export function SystemStatePage({code,title,copy}:{code:string;title:string;copy:string}){return <StatePage><Brand/><strong>{code}</strong><h1>{title}</h1><p>{copy}</p><ButtonLink to="/">Return home</ButtonLink></StatePage>}
-export function PublicFooter(){return <Footer><Brand/><p>Local Innovation Discovery & Knowledge Exchange Platform</p><div><Link to="/about">About</Link><Link to="/statistics">Statistics</Link><Link to="/login">Sign in</Link></div></Footer>}
+export function SystemStatePage({
+  code,
+  title,
+  copy,
+}: {
+  code: string;
+  title: string;
+  copy: string;
+}) {
+  return (
+    <StatePage>
+      <Brand />
+      <strong>{code}</strong>
+      <h1>{title}</h1>
+      <p>{copy}</p>
+      <ButtonLink to="/">Return home</ButtonLink>
+    </StatePage>
+  );
+}
+export function PublicFooter() {
+  return (
+    <Footer>
+      <Brand />
+      <p>Local Innovation Discovery & Knowledge Exchange Platform</p>
+      <div>
+        <Link to="/about">About</Link>
+        <Link to="/statistics">Statistics</Link>
+        <Link to="/login">Sign in</Link>
+      </div>
+    </Footer>
+  );
+}
 
-const Announcement=styled.div`background:${palette.ink};color:#d9e9df;display:flex;justify-content:center;align-items:center;gap:22px;padding:8px 20px;font-size:12px;a{display:flex;align-items:center;gap:6px;color:white;font-weight:700}@media(max-width:560px){justify-content:space-between}`;
-const PublicNav=styled.header`height:76px;max-width:1240px;margin:auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:30px;nav{display:flex;gap:28px;color:${palette.muted};font-weight:600;font-size:14px}div{display:flex;gap:8px}@media(max-width:760px){nav{display:none}div>a:first-of-type{display:none}}`;
-const Hero=styled.section`max-width:1240px;margin:auto;padding:72px 24px;display:grid;grid-template-columns:1.05fr .95fr;gap:68px;align-items:center;@media(max-width:820px){grid-template-columns:1fr;gap:38px;padding-top:48px}`;
-const HeroCopy=styled.div`h1{font-family:Fraunces,serif;font-size:clamp(49px,6.3vw,82px);letter-spacing:-.065em;line-height:.98;margin:14px 0 22px;max-width:700px}em{color:${palette.green}}p{font-size:18px;color:${palette.muted};max-width:570px;line-height:1.65}`;
-const HeroActions=styled.div`display:flex;gap:10px;flex-wrap:wrap;margin:28px 0`;
-const Trust=styled.div`display:flex;align-items:center;gap:10px;color:${palette.muted};font-size:13px;svg{color:${palette.green}}`;
-const HeroVisual=styled.div`min-height:420px;border-radius:22px;padding:32px;background:radial-gradient(circle at 100% 0,${palette.lime} 0 35%,transparent 35%),${palette.soft};border:1px solid #cfe2d3;position:relative;overflow:hidden;h2{font-family:Fraunces,serif;font-size:42px;line-height:1.05;letter-spacing:-.04em;margin:80px 0 8px}p{color:${palette.green};font-weight:700}`;
-const HeroTag=styled.span`padding:7px 9px;background:white;border-radius:7px;text-transform:uppercase;font-size:10px;letter-spacing:.08em;font-weight:800`;
-const HeroJourney=styled.div`position:absolute;left:30px;right:30px;bottom:30px;background:${palette.green};color:white;padding:18px;border-radius:14px;display:flex;align-items:center;gap:13px;box-shadow:0 18px 35px #073f3830;>span{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#ffffff17}div{display:flex;flex-direction:column;flex:1}small{color:#cbe0d8}`;
-const ImpactBand=styled.section`background:${palette.greenDark};color:white;display:grid;grid-template-columns:repeat(4,1fr);padding:30px max(24px,calc((100% - 1192px)/2));div{padding:8px 22px;border-right:1px solid #ffffff22;display:flex;flex-direction:column}strong{font-family:Fraunces,serif;font-size:34px}span{color:#cbe0d8;font-size:12px}@media(max-width:650px){grid-template-columns:1fr 1fr;div:nth-of-type(2){border:0}}`;
-const Section=styled.section`max-width:1240px;margin:auto;padding:86px 24px`;
-const SectionTop=styled.div`display:flex;justify-content:space-between;align-items:end;gap:22px;margin-bottom:28px;h2{font-family:Fraunces,serif;font-size:clamp(34px,4.5vw,50px);letter-spacing:-.05em;margin:10px 0 0}@media(max-width:600px){align-items:start;flex-direction:column}`;
-const InnovationGrid=styled.div`display:grid;grid-template-columns:repeat(3,1fr);gap:18px;@media(max-width:860px){grid-template-columns:1fr 1fr}@media(max-width:560px){grid-template-columns:1fr}`;
-const Card=styled.article`background:white;border:1px solid ${palette.line};border-radius:15px;overflow:hidden;transition:.18s;&:hover{transform:translateY(-3px);box-shadow:0 14px 30px #102a2710}`;
-const CardArt=styled.div<{$tone:string}>`height:170px;padding:15px;display:flex;justify-content:space-between;align-items:start;background:${({$tone})=>({mint:'#b9ddbb',amber:'#f2d493',blue:'#bbd6de',sage:'#cbdca8',lavender:'#d9d0e8',aqua:'#b9e1dc'}[$tone]||'#cfe0d4')};position:relative;overflow:hidden;&:after{content:'';position:absolute;width:190px;height:190px;border-radius:50%;border:28px solid #ffffff80;right:-60px;bottom:-110px}b{font-family:Fraunces,serif;font-size:65px;color:#ffffffb5;position:absolute;right:20px;bottom:0}`;
-const CardBody=styled.div`padding:19px;h3{font-family:Fraunces,serif;font-size:23px;line-height:1.15;letter-spacing:-.035em;margin:9px 0 7px}p{font-size:13px;color:${palette.muted};min-height:60px;margin:0;line-height:1.55}`;
-const CardMeta=styled.div`display:flex;justify-content:space-between;gap:10px;color:${palette.green};font-size:10px;text-transform:uppercase;font-weight:800;letter-spacing:.05em;span:last-of-type{color:${palette.muted};display:flex;align-items:center;gap:3px}`;
-const CardFoot=styled.div`display:flex;justify-content:space-between;align-items:center;border-top:1px solid ${palette.line};margin-top:16px;padding-top:14px;div{display:flex;flex-direction:column}small{color:${palette.muted};font-size:10px}strong{font-size:12px}a{background:${palette.green};color:white;width:36px;height:36px;border-radius:50%;display:grid;place-items:center}`;
-const RoleBand=styled.section`background:${palette.soft};padding:75px max(24px,calc((100% - 1192px)/2));display:grid;grid-template-columns:.75fr 1.25fr;gap:70px;h2{font-family:Fraunces,serif;font-size:43px;line-height:1.05;letter-spacing:-.05em;margin:10px 0}p{color:${palette.muted}}@media(max-width:820px){grid-template-columns:1fr;gap:30px}`;
-const RoleGrid=styled.div`display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #bfd5c4;border-left:1px solid #bfd5c4;article{padding:20px;border-right:1px solid #bfd5c4;border-bottom:1px solid #bfd5c4}span{font-size:11px;color:${palette.green};font-weight:800}h3{margin:8px 0 2px}p{font-size:12px;margin:0}`;
-const PageSurface=styled.main`max-width:1240px;margin:auto;padding:55px 24px 90px;min-height:70vh`;
-const FilterPanel=styled.div`display:grid;grid-template-columns:1.5fr repeat(3,1fr) auto;gap:9px;padding:11px;background:white;border:1px solid ${palette.line};border-radius:13px;@media(max-width:920px){grid-template-columns:1fr 1fr}@media(max-width:560px){grid-template-columns:1fr}`;
-const SearchField=styled.div`position:relative;svg{position:absolute;left:13px;top:13px;color:${palette.muted}}input{padding-left:41px}`;
-const ResultLine=styled.div`display:flex;gap:10px;align-items:center;margin:23px 0 14px;font-size:13px;span{color:${palette.muted}}`;
-const DetailHero=styled.section<{$tone:string}>`background:${({$tone})=>({mint:'#eaf5e8',amber:'#fff6e7',blue:'#eef7f9'}[$tone]||palette.soft)};border-bottom:1px solid ${palette.line}`;
-const DetailHeroInner=styled.div`max-width:1050px;margin:auto;padding:40px 24px 55px;>div:nth-of-type(2){display:flex;gap:12px;align-items:center;margin-top:26px;color:${palette.muted};font-size:12px;span{display:flex;align-items:center;gap:4px}}h1{font-family:Fraunces,serif;font-size:clamp(42px,6vw,70px);line-height:1;letter-spacing:-.055em;margin:16px 0;max-width:850px}p{font-size:18px;max-width:740px;color:${palette.muted}}`;
-const DetailActions=styled.div`display:flex;gap:9px;margin-top:24px;flex-wrap:wrap`;
-const DetailGrid=styled.div`display:grid;grid-template-columns:1.4fr .7fr;gap:55px;aside{display:flex;flex-direction:column;gap:14px}@media(max-width:820px){grid-template-columns:1fr}`;
-const ContentSection=styled.section`padding:15px 0 32px;border-bottom:1px solid ${palette.line};h2{font-family:Fraunces,serif;font-size:34px;letter-spacing:-.04em;margin:8px 0}p{font-size:17px;color:${palette.muted};line-height:1.75;max-width:750px}`;
-const Timeline=styled.div`>div{display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:center;padding:14px 0;border-bottom:1px solid ${palette.line}}svg{color:${palette.green}}span{display:flex;flex-direction:column}small{color:${palette.muted}}`;
-const SnapshotList=styled.div`display:flex;flex-direction:column;gap:15px;div{display:flex;flex-direction:column;padding-bottom:12px;border-bottom:1px solid ${palette.line}}span{font-size:11px;color:${palette.muted};text-transform:uppercase;font-weight:700}strong{font-size:14px;margin-top:2px}`;
-const MetricStack=styled.div`display:grid;grid-template-columns:1fr 1fr;gap:16px;div{display:flex;flex-direction:column}strong{font-family:Fraunces,serif;font-size:28px;color:${palette.green}}span{font-size:11px;color:${palette.muted}}`;
-const Owner=styled.div`display:flex;align-items:center;gap:12px;>span{width:43px;height:43px;border-radius:50%;display:grid;place-items:center;background:${palette.green};color:white;font-weight:800}div{display:flex;flex-direction:column}small{color:${palette.muted}}`;
-const Notice=styled.div`display:flex;align-items:flex-start;gap:10px;background:${palette.warningSoft};color:${palette.warning};padding:14px;border:1px solid #fedf89;border-radius:11px;font-size:11px;p{margin:0}svg{flex:none}`;
-const StatsGrid=styled.div`display:grid;grid-template-columns:1.25fr .75fr;gap:18px;@media(max-width:800px){grid-template-columns:1fr}`;
-const BarChart=styled.div`height:250px;display:flex;align-items:end;gap:12px;padding-top:20px;border-bottom:1px solid ${palette.line};>div{height:100%;flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:7px}span{display:block;width:min(46px,80%);background:${palette.green};border-radius:7px 7px 0 0;min-height:6px}small{color:${palette.muted}}`;
-const SectorList=styled.div`display:flex;flex-direction:column;gap:17px;>div>span{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px}small{color:${palette.muted}}>div>div{height:8px;border-radius:999px;background:#ecf0ed;overflow:hidden}i{display:block;height:100%;background:${palette.lime};border-radius:inherit}`;
-const AuthShell=styled.main`min-height:100dvh;max-width:1240px;margin:auto;padding:22px 24px`;
-const AuthBrand=styled.header`display:flex;justify-content:space-between;align-items:center`;
-const AuthGrid=styled.div`display:grid;grid-template-columns:1fr 460px;gap:80px;align-items:center;min-height:calc(100dvh - 90px);@media(max-width:850px){grid-template-columns:1fr;gap:30px;padding:45px 0}`;
-const AuthIntro=styled.div`h1{font-family:Fraunces,serif;font-size:clamp(45px,6vw,72px);line-height:1;letter-spacing:-.055em;margin:12px 0}p{color:${palette.muted};font-size:17px;max-width:580px}`;
-const AuthTrust=styled.div`display:flex;gap:12px;margin-top:30px;color:${palette.green};max-width:500px;div{display:flex;flex-direction:column}span{font-size:12px;color:${palette.muted};margin-top:2px}`;
-const AuthForm=styled.form`display:flex;flex-direction:column;gap:17px`;
-const AuthLinks=styled.div`display:flex;justify-content:space-between;color:${palette.green};font-size:12px;font-weight:700`;
-const FormError=styled.div`padding:10px 12px;border-radius:8px;background:#fef3f2;color:${palette.danger};font-size:12px`;
-const DemoGrid=styled.div`display:grid;grid-template-columns:repeat(3,1fr);gap:16px;@media(max-width:900px){grid-template-columns:1fr 1fr}@media(max-width:560px){grid-template-columns:1fr}`;
-const DemoCard=styled(Panel)`padding:20px;display:grid;grid-template-columns:50px 1fr;gap:14px;align-items:start;>div h2{font-size:17px;margin:7px 0 1px}>div p{font-size:12px;color:${palette.muted};margin:0}>button{grid-column:1/-1}`;
-const Avatar=styled.span`width:48px;height:48px;border-radius:13px;background:${palette.green};color:white;display:grid;place-items:center;font-weight:800`;
-const RoleLabel=styled.div`grid-column:1/-1;padding:10px;border-radius:8px;background:${palette.soft};font-size:11px;color:${palette.green};font-weight:800;text-align:center;letter-spacing:.05em`;
-const ProcessGrid=styled.div`display:grid;grid-template-columns:repeat(3,1fr);gap:15px;h2{font-family:Fraunces,serif;font-size:29px;margin:8px 0}p{color:${palette.muted};font-size:13px}@media(max-width:750px){grid-template-columns:1fr}`;
-const StatePage=styled.main`min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;>strong{font-family:Fraunces,serif;color:${palette.green};font-size:90px;line-height:1;margin-top:40px}h1{font-family:Fraunces,serif;font-size:40px;margin:10px 0}p{color:${palette.muted};max-width:550px;margin:0 0 22px}`;
-const Footer=styled.footer`max-width:1240px;margin:auto;border-top:1px solid ${palette.line};padding:35px 24px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:24px;color:${palette.muted};font-size:12px;div{display:flex;gap:20px;font-weight:700}@media(max-width:700px){grid-template-columns:1fr}`;
+const Announcement = styled.div`
+  background: ${palette.ink};
+  color: #d9e9df;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+  padding: 8px 20px;
+  font-size: 12px;
+  a {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: white;
+    font-weight: 700;
+  }
+  @media (max-width: 560px) {
+    justify-content: space-between;
+  }
+`;
+const PublicNav = styled.header`
+  height: 76px;
+  max-width: 1240px;
+  margin: auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  nav {
+    display: flex;
+    gap: 28px;
+    color: ${palette.muted};
+    font-weight: 600;
+    font-size: 14px;
+  }
+  div {
+    display: flex;
+    gap: 8px;
+  }
+  @media (max-width: 760px) {
+    nav {
+      display: none;
+    }
+    div > a:first-of-type {
+      display: none;
+    }
+  }
+`;
+const Hero = styled.section`
+  max-width: 1240px;
+  margin: auto;
+  padding: 72px 24px;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 68px;
+  align-items: center;
+  @media (max-width: 820px) {
+    grid-template-columns: 1fr;
+    gap: 38px;
+    padding-top: 48px;
+  }
+`;
+const HeroCopy = styled.div`
+  h1 {
+    font-family: Inter, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: clamp(32px, 3.4vw, 52px);
+    letter-spacing: -0.05em;
+    line-height: 1.05;
+    margin: 14px 0 20px;
+    max-width: 700px;
+    font-weight: 700;
+  }
+  em {
+    color: ${palette.green};
+  }
+  p {
+    font-size: 18px;
+    color: ${palette.muted};
+    max-width: 570px;
+    line-height: 1.65;
+  }
+`;
+const HeroActions = styled.div`
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 28px 0;
+`;
+const Trust = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: ${palette.muted};
+  font-size: 13px;
+  svg {
+    color: ${palette.green};
+  }
+`;
+const HeroVisual = styled.div`
+  min-height: 420px;
+  border-radius: 22px;
+  padding: 32px;
+  background:
+    radial-gradient(circle at 100% 0, ${palette.lime} 0 35%, transparent 35%),
+    ${palette.soft};
+  border: 1px solid #cfe2d3;
+  position: relative;
+  overflow: hidden;
+  h2 {
+    font-family: Inter, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 30px;
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+    margin: 80px 0 8px;
+    font-weight: 700;
+  }
+  p {
+    color: ${palette.green};
+    font-weight: 700;
+  }
+`;
+const HeroTag = styled.span`
+  padding: 7px 9px;
+  background: white;
+  border-radius: 7px;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+`;
+const HeroJourney = styled.div`
+  position: absolute;
+  left: 30px;
+  right: 30px;
+  bottom: 30px;
+  background: ${palette.green};
+  color: white;
+  padding: 18px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  box-shadow: 0 18px 35px #073f3830;
+  > span {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: #ffffff17;
+  }
+  div {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+  small {
+    color: #cbe0d8;
+  }
+`;
+const ImpactBand = styled.section`
+  background: ${palette.greenDark};
+  color: white;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 30px max(24px, calc((100% - 1192px) / 2));
+  div {
+    padding: 8px 22px;
+    border-right: 1px solid #ffffff22;
+    display: flex;
+    flex-direction: column;
+  }
+  strong {
+    font-family: "Roboto Mono", monospace;
+    font-size: 28px;
+    line-height: 1.1;
+    font-weight: 600;
+  }
+  span {
+    color: #cbe0d8;
+    font-size: 12px;
+  }
+  @media (max-width: 650px) {
+    grid-template-columns: 1fr 1fr;
+    div:nth-of-type(2) {
+      border: 0;
+    }
+  }
+`;
+const Section = styled.section`
+  max-width: 1240px;
+  margin: auto;
+  padding: 86px 24px;
+`;
+const SectionTop = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 22px;
+  margin-bottom: 28px;
+  h2 {
+    font-family: Inter, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: clamp(26px, 2.7vw, 36px);
+    letter-spacing: -0.04em;
+    margin: 10px 0 0;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+  @media (max-width: 600px) {
+    align-items: start;
+    flex-direction: column;
+  }
+`;
+const InnovationGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  @media (max-width: 860px) {
+    grid-template-columns: 1fr 1fr;
+  }
+  @media (max-width: 560px) {
+    grid-template-columns: 1fr;
+  }
+`;
+const Card = styled.article`
+  background: white;
+  border: 1px solid ${palette.line};
+  border-radius: 15px;
+  overflow: hidden;
+  transition: 0.18s;
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 30px #102a2710;
+  }
+`;
+const CardArt = styled.div<{ $tone: string }>`
+  height: 170px;
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  background: ${({ $tone }) =>
+    ({
+      mint: "#b9ddbb",
+      amber: "#f2d493",
+      blue: "#bbd6de",
+      sage: "#cbdca8",
+      lavender: "#d9d0e8",
+      aqua: "#b9e1dc",
+    })[$tone] || "#cfe0d4"};
+  position: relative;
+  overflow: hidden;
+  &:after {
+    content: "";
+    position: absolute;
+    width: 190px;
+    height: 190px;
+    border-radius: 50%;
+    border: 28px solid #ffffff80;
+    right: -60px;
+    bottom: -110px;
+  }
+  b {
+    font-family: "Montserrat", sans-serif;
+    font-size: 65px;
+    color: #ffffffb5;
+    position: absolute;
+    right: 20px;
+    bottom: 0;
+  }
+`;
+const CardBody = styled.div`
+  padding: 19px;
+  h3 {
+    font-family: Inter, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 20px;
+    line-height: 1.2;
+    letter-spacing: -0.03em;
+    margin: 9px 0 7px;
+    font-weight: 700;
+  }
+  p {
+    font-size: 13px;
+    color: ${palette.muted};
+    min-height: 60px;
+    margin: 0;
+    line-height: 1.55;
+  }
+`;
+const CardMeta = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: ${palette.green};
+  font-size: 10px;
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  span:last-of-type {
+    color: ${palette.muted};
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+`;
+const CardFoot = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid ${palette.line};
+  margin-top: 16px;
+  padding-top: 14px;
+  div {
+    display: flex;
+    flex-direction: column;
+  }
+  small {
+    color: ${palette.muted};
+    font-size: 10px;
+  }
+  strong {
+    font-size: 12px;
+  }
+  a {
+    background: ${palette.green};
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+  }
+`;
+const RoleBand = styled.section`
+  background: ${palette.soft};
+  padding: 75px max(24px, calc((100% - 1192px) / 2));
+  display: grid;
+  grid-template-columns: 0.75fr 1.25fr;
+  gap: 70px;
+  h2 {
+    font-family: Inter, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 30px;
+    line-height: 1.12;
+    letter-spacing: -0.045em;
+    margin: 10px 0;
+    font-weight: 700;
+  }
+  p {
+    color: ${palette.muted};
+  }
+  @media (max-width: 820px) {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+`;
+const RoleGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px solid #bfd5c4;
+  border-left: 1px solid #bfd5c4;
+  article {
+    padding: 20px;
+    border-right: 1px solid #bfd5c4;
+    border-bottom: 1px solid #bfd5c4;
+  }
+  span {
+    font-size: 11px;
+    color: ${palette.green};
+    font-weight: 800;
+  }
+  h3 {
+    margin: 8px 0 2px;
+  }
+  p {
+    font-size: 12px;
+    margin: 0;
+  }
+`;
+const PageSurface = styled.main`
+  max-width: 1240px;
+  margin: auto;
+  padding: 55px 24px 90px;
+  min-height: 70vh;
+`;
+const FilterPanel = styled.div`
+  display: grid;
+  grid-template-columns: 1.5fr repeat(3, 1fr) auto;
+  gap: 9px;
+  padding: 11px;
+  background: white;
+  border: 1px solid ${palette.line};
+  border-radius: 13px;
+  @media (max-width: 920px) {
+    grid-template-columns: 1fr 1fr;
+  }
+  @media (max-width: 560px) {
+    grid-template-columns: 1fr;
+  }
+`;
+const SearchField = styled.div`
+  position: relative;
+  svg {
+    position: absolute;
+    left: 13px;
+    top: 13px;
+    color: ${palette.muted};
+  }
+  input {
+    padding-left: 41px;
+  }
+`;
+const ResultLine = styled.div`
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 23px 0 14px;
+  font-size: 13px;
+  span {
+    color: ${palette.muted};
+  }
+`;
+const DetailHero = styled.section<{ $tone: string }>`
+  background: ${({ $tone }) =>
+    ({ mint: "#eaf5e8", amber: "#fff6e7", blue: "#eef7f9" })[$tone] ||
+    palette.soft};
+  border-bottom: 1px solid ${palette.line};
+`;
+const DetailHeroInner = styled.div`
+  max-width: 1050px;
+  margin: auto;
+  padding: 40px 24px 55px;
+  > div:nth-of-type(2) {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-top: 26px;
+    color: ${palette.muted};
+    font-size: 12px;
+    span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+  }
+  h1 {
+    font-family: Inter, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: clamp(30px, 3.4vw, 48px);
+    line-height: 1.08;
+    letter-spacing: -0.05em;
+    margin: 16px 0;
+    max-width: 850px;
+    font-weight: 700;
+  }
+  p {
+    font-size: 18px;
+    max-width: 740px;
+    color: ${palette.muted};
+  }
+`;
+const DetailActions = styled.div`
+  display: flex;
+  gap: 9px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+`;
+const DetailGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1.4fr 0.7fr;
+  gap: 55px;
+  aside {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  @media (max-width: 820px) {
+    grid-template-columns: 1fr;
+  }
+`;
+const ContentSection = styled.section`
+  padding: 15px 0 32px;
+  border-bottom: 1px solid ${palette.line};
+  h2 {
+    font-family: Inter, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 28px;
+    letter-spacing: -0.04em;
+    margin: 8px 0;
+    font-weight: 700;
+  }
+  p {
+    font-size: 17px;
+    color: ${palette.muted};
+    line-height: 1.75;
+    max-width: 750px;
+  }
+`;
+const Timeline = styled.div`
+  > div {
+    display: grid;
+    grid-template-columns: 24px 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 14px 0;
+    border-bottom: 1px solid ${palette.line};
+  }
+  svg {
+    color: ${palette.green};
+  }
+  span {
+    display: flex;
+    flex-direction: column;
+  }
+  small {
+    color: ${palette.muted};
+  }
+`;
+const SnapshotList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  div {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 12px;
+    border-bottom: 1px solid ${palette.line};
+  }
+  span {
+    font-size: 11px;
+    color: ${palette.muted};
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  strong {
+    font-size: 14px;
+    margin-top: 2px;
+  }
+`;
+const MetricStack = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  div {
+    display: flex;
+    flex-direction: column;
+  }
+  strong {
+    font-family: "Roboto Mono", monospace;
+    font-size: 26px;
+    color: ${palette.green};
+    line-height: 1.15;
+    font-weight: 600;
+  }
+  span {
+    font-size: 11px;
+    color: ${palette.muted};
+  }
+`;
+const Owner = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  > span {
+    width: 43px;
+    height: 43px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: ${palette.green};
+    color: white;
+    font-weight: 800;
+  }
+  div {
+    display: flex;
+    flex-direction: column;
+  }
+  small {
+    color: ${palette.muted};
+  }
+`;
+const Notice = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: ${palette.warningSoft};
+  color: ${palette.warning};
+  padding: 14px;
+  border: 1px solid #fedf89;
+  border-radius: 11px;
+  font-size: 11px;
+  p {
+    margin: 0;
+  }
+  svg {
+    flex: none;
+  }
+`;
+const StatsGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1.25fr 0.75fr;
+  gap: 18px;
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
+  }
+`;
+const BarChart = styled.div`
+  height: 250px;
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  padding-top: 20px;
+  border-bottom: 1px solid ${palette.line};
+  > div {
+    height: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 7px;
+  }
+  span {
+    display: block;
+    width: min(46px, 80%);
+    background: ${palette.green};
+    border-radius: 7px 7px 0 0;
+    min-height: 6px;
+  }
+  small {
+    color: ${palette.muted};
+  }
+`;
+const SectorList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+  > div > span {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 6px;
+  }
+  small {
+    color: ${palette.muted};
+  }
+  > div > div {
+    height: 8px;
+    border-radius: 999px;
+    background: #ecf0ed;
+    overflow: hidden;
+  }
+  i {
+    display: block;
+    height: 100%;
+    background: ${palette.lime};
+    border-radius: inherit;
+  }
+`;
+const AuthShell = styled.main`
+  min-height: 100dvh;
+  max-width: 1240px;
+  margin: auto;
+  padding: 22px 24px;
+`;
+const AuthBrand = styled.header`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+const AuthGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 460px;
+  gap: 80px;
+  align-items: center;
+  min-height: calc(100dvh - 90px);
+  @media (max-width: 850px) {
+    grid-template-columns: 1fr;
+    gap: 30px;
+    padding: 45px 0;
+  }
+`;
+const AuthIntro = styled.div`
+  h1 {
+    font-family: Inter, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: clamp(32px, 3.7vw, 48px);
+    line-height: 1.08;
+    letter-spacing: -0.05em;
+    margin: 12px 0;
+    font-weight: 700;
+  }
+  p {
+    color: ${palette.muted};
+    font-size: 17px;
+    max-width: 580px;
+  }
+`;
+const AuthTrust = styled.div`
+  display: flex;
+  gap: 12px;
+  margin-top: 30px;
+  color: ${palette.green};
+  max-width: 500px;
+  div {
+    display: flex;
+    flex-direction: column;
+  }
+  span {
+    font-size: 12px;
+    color: ${palette.muted};
+    margin-top: 2px;
+  }
+`;
+const AuthForm = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+`;
+const RoleChoices = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 8px;
+  label {
+    min-height: 62px;
+    border: 1px solid ${palette.line};
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  }
+  label.selected {
+    border-color: ${palette.green};
+    background: ${palette.soft};
+  }
+  input {
+    width: 18px;
+    height: 18px;
+    accent-color: ${palette.green};
+  }
+  span {
+    display: flex;
+    flex-direction: column;
+  }
+  b {
+    font-size: 13px;
+  }
+  small {
+    color: ${palette.muted};
+    font-size: 11px;
+  }
+  fieldset {
+    border: 0;
+    padding: 0;
+    margin: 0;
+  }
+  legend {
+    font-size: 13px;
+    font-weight: 700;
+  }
+`;
+const AuthLinks = styled.div`
+  display: flex;
+  justify-content: space-between;
+  color: ${palette.green};
+  font-size: 12px;
+  font-weight: 700;
+`;
+const FormError = styled.div`
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fef3f2;
+  color: ${palette.danger};
+  font-size: 12px;
+`;
+const DemoGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr 1fr;
+  }
+  @media (max-width: 560px) {
+    grid-template-columns: 1fr;
+  }
+`;
+const DemoCard = styled(Panel)`
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 50px 1fr;
+  gap: 14px;
+  align-items: start;
+  > div h2 {
+    font-size: 17px;
+    margin: 7px 0 1px;
+  }
+  > div p {
+    font-size: 12px;
+    color: ${palette.muted};
+    margin: 0;
+  }
+  > button {
+    grid-column: 1/-1;
+  }
+`;
+const Avatar = styled.span`
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  background: ${palette.green};
+  color: white;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+`;
+const RoleLabel = styled.div`
+  grid-column: 1/-1;
+  padding: 10px;
+  border-radius: 8px;
+  background: ${palette.soft};
+  font-size: 11px;
+  color: ${palette.green};
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0.05em;
+`;
+const ProcessGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  h2 {
+    font-family: Inter, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 24px;
+    margin: 8px 0;
+    font-weight: 700;
+  }
+  p {
+    color: ${palette.muted};
+    font-size: 13px;
+  }
+  @media (max-width: 750px) {
+    grid-template-columns: 1fr;
+  }
+`;
+const StatePage = styled.main`
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  > strong {
+    font-family: Inter, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color: ${palette.green};
+    font-size: 64px;
+    line-height: 1;
+    margin-top: 40px;
+    font-weight: 700;
+  }
+  h1 {
+    font-family: Inter, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 34px;
+    margin: 10px 0;
+    font-weight: 700;
+  }
+  p {
+    color: ${palette.muted};
+    max-width: 550px;
+    margin: 0 0 22px;
+  }
+`;
+const Footer = styled.footer`
+  max-width: 1240px;
+  margin: auto;
+  border-top: 1px solid ${palette.line};
+  padding: 35px 24px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 24px;
+  color: ${palette.muted};
+  font-size: 12px;
+  div {
+    display: flex;
+    gap: 20px;
+    font-weight: 700;
+  }
+  @media (max-width: 700px) {
+    grid-template-columns: 1fr;
+  }
+`;
