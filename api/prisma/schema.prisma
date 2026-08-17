@@ -165,6 +165,7 @@ model User {
   expertAssignments   ExpertAssignment[] @relation("AssignedExpert")
   assignmentsMade     ExpertAssignment[] @relation("AssignmentAdministrator")
   reviews             Review[] @relation("ReviewReviewer")
+  innovationAdministratorReviews InnovationAdministratorReview[] @relation("InnovationAdministratorReviewer")
   engagements         Engagement[] @relation("EngagementPartner")
   engagementConsents  EngagementConsent[]
   notifications       Notification[]
@@ -235,6 +236,7 @@ model Innovation {
   milestones         Milestone[]
   engagements        Engagement[]
   expertAssignment   ExpertAssignment?
+  administratorReview InnovationAdministratorReview?
 
   @@index([ownerId, status])
   @@index([status, publishedAt])
@@ -274,6 +276,7 @@ model InnovationVersion {
   updatedAt            DateTime   @updatedAt
   innovation           Innovation @relation("InnovationVersions", fields: [innovationId], references: [id], onDelete: Cascade)
   publishedFor         Innovation? @relation("PublishedInnovationVersion")
+  administratorReview InnovationAdministratorReview?
   evidenceFiles        EvidenceFile[]
   assignments          ExpertAssignment[]
   reviews              Review[]
@@ -282,6 +285,19 @@ model InnovationVersion {
 
   @@unique([innovationId, versionNumber])
   @@index([innovationId, submittedAt])
+}
+
+model InnovationAdministratorReview {
+  id           String   @id @default(uuid()) @db.Uuid
+  innovationId String   @unique @db.Uuid
+  versionId    String   @unique @db.Uuid
+  reviewedById String   @db.Uuid
+  reviewedAt   DateTime @default(now())
+  innovation   Innovation @relation(fields: [innovationId], references: [id], onDelete: Cascade)
+  version      InnovationVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  reviewedBy   User @relation("InnovationAdministratorReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+
+  @@index([reviewedById, reviewedAt])
 }
 
 model EvidenceFile {
@@ -341,7 +357,7 @@ model ExpertAssignment {
   version       InnovationVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
   expert        User             @relation("AssignedExpert", fields: [expertId], references: [id], onDelete: Restrict)
   assignedBy    User             @relation("AssignmentAdministrator", fields: [assignedById], references: [id], onDelete: Restrict)
-  review        Review?
+  reviews       Review[]
 
   @@unique([versionId, expertId])
   @@index([expertId, status, dueAt])
@@ -349,7 +365,7 @@ model ExpertAssignment {
 
 model Review {
   id                String         @id @default(uuid()) @db.Uuid
-  assignmentId      String         @unique @db.Uuid
+  assignmentId      String         @db.Uuid
   versionId         String         @db.Uuid
   reviewerId        String         @db.Uuid
   criteriaVersionId String         @db.Uuid
@@ -367,6 +383,7 @@ model Review {
   scores            ReviewCriterionScore[]
   revisionRequests  RevisionRequest[]
 
+  @@unique([assignmentId, versionId])
   @@index([versionId, status])
 }
 
@@ -406,6 +423,7 @@ model RevisionRequest {
 
 model Engagement {
   id                     String           @id @default(uuid()) @db.Uuid
+  requestKey             String?          @unique @db.VarChar(80)
   innovationId           String           @db.Uuid
   innovationVersionId    String           @db.Uuid
   partnerId              String           @db.Uuid

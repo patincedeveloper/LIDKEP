@@ -1,4 +1,11 @@
 import { z } from 'zod';
+import {
+  addIdentificationIssues,
+  fullNameSchema,
+  optionalNarrative,
+  projectCoverageSchema,
+  rwandaPhoneSchema
+} from './common.validator.js';
 
 const request = ({ body = z.unknown().optional(), params = z.object({}).strict(), query = z.object({}).strict() } = {}) =>
   z.object({ body, params, query });
@@ -12,12 +19,17 @@ const password = z.string()
   .regex(/[^A-Za-z0-9]/, 'Password must contain a special character.');
 const managedRole = z.enum(['SYSTEM_ADMINISTRATOR', 'INNOVATOR', 'EXPERT', 'INVESTOR_PARTNER']);
 const accountStatus = z.enum(['ACTIVE', 'PENDING_APPROVAL', 'SUSPENDED', 'DISABLED']);
+const optionalIdentificationType = z.union([
+  z.enum(['NATIONAL_ID', 'PASSPORT', 'OTHER_GOVERNMENT_ID']),
+  z.literal('')
+]).optional();
+const optionalPhone = z.union([rwandaPhoneSchema, z.literal('')]).optional();
 const profileFields = {
-  displayName: z.string().trim().min(2).max(120),
+  displayName: fullNameSchema,
   organization: z.string().trim().max(160).optional(),
-  identificationType: z.string().trim().max(60).optional(),
+  identificationType: optionalIdentificationType,
   identificationNumber: z.string().trim().max(30).optional(),
-  phoneNumber: z.string().trim().max(30).optional(),
+  phoneNumber: optionalPhone,
   educationLevel: z.string().trim().max(120).optional(),
   province: z.string().trim().max(100).optional(),
   district: z.string().trim().max(100).optional(),
@@ -46,7 +58,7 @@ export const createUserSchema = request({
     role: managedRole,
     status: accountStatus.default('ACTIVE'),
     ...profileFields
-  }).strict()
+  }).strict().superRefine((value, context) => addIdentificationIssues(value, context, { optional: true }))
 });
 
 export const updateUserSchema = request({
@@ -56,7 +68,7 @@ export const updateUserSchema = request({
     role: managedRole,
     status: accountStatus,
     ...profileFields
-  }).strict()
+  }).strict().superRefine((value, context) => addIdentificationIssues(value, context, { optional: true }))
 });
 
 export const updateUserStatusSchema = request({
@@ -64,14 +76,6 @@ export const updateUserStatusSchema = request({
   body: z.object({
     status: z.enum(['ACTIVE', 'SUSPENDED', 'DISABLED']),
     reason: z.string().trim().min(3).max(1000).optional()
-  }).strict()
-});
-
-export const decideInnovationSchema = request({
-  params: idParams,
-  body: z.object({
-    status: z.enum(['UNDER_REVIEW', 'REVISION_REQUIRED', 'APPROVED', 'REJECTED', 'PUBLISHED', 'ARCHIVED']),
-    reason: z.string().trim().min(3).max(2000).optional()
   }).strict()
 });
 
@@ -88,22 +92,22 @@ export const createAdminInnovationSchema = request({
   body: z.object({
     ownerId: z.string().uuid(),
     title: z.string().trim().min(3).max(180),
-    summary: optionalText(600),
-    problem: optionalText(5000),
-    solution: optionalText(5000),
-    beneficiaries: optionalText(3000),
+    summary: optionalNarrative(),
+    problem: optionalNarrative(),
+    solution: optionalNarrative(),
+    beneficiaries: optionalNarrative(),
     sector: optionalText(120),
     category: optionalText(120),
-    district: optionalText(120),
+    district: projectCoverageSchema.optional(),
     maturity: optionalText(120),
     impactArea: optionalText(120),
-    impact: optionalText(3000),
-    novelty: optionalText(3000),
-    currentEvidence: optionalText(3000),
-    implementationPlan: optionalText(3000),
-    scalability: optionalText(3000),
-    sustainability: optionalText(3000),
-    supportNeeded: optionalText(2000)
+    impact: optionalNarrative(),
+    novelty: optionalNarrative(),
+    currentEvidence: optionalNarrative(),
+    implementationPlan: optionalNarrative(),
+    scalability: optionalNarrative(),
+    sustainability: optionalNarrative(),
+    supportNeeded: optionalNarrative()
   }).strict()
 });
 

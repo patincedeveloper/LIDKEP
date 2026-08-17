@@ -5,6 +5,10 @@ export async function list(req, res) {
   res.json(successResponse(req, await innovationsService.listInnovations(req.user)));
 }
 
+export async function feedback(req, res) {
+  res.json(successResponse(req, await innovationsService.listFeedback(req.user)));
+}
+
 export async function show(req, res) {
   res.json(successResponse(req, await innovationsService.getInnovation(req.user, req.validated.params.id)));
 }

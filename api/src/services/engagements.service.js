@@ -62,31 +62,40 @@ export async function createEngagement(partner, input, requestId) {
   });
   if (!innovation?.publishedVersion) throw new AppError(404, 'PUBLISHED_INNOVATION_NOT_FOUND', 'Choose a published innovation.');
   const existing = await prisma.engagement.findFirst({
-    where: { innovationId: innovation.id, partnerId: partner.id, type: input.type, status: { in: ['PENDING', 'ACCEPTED', 'CLARIFICATION_REQUESTED'] } }
+    where: { innovationId: innovation.id, partnerId: partner.id }
   });
-  if (existing) throw new AppError(409, 'ENGAGEMENT_ALREADY_OPEN', 'You already have an open request of this type for this innovation.');
-  const created = await prisma.$transaction(async (tx) => {
-    const record = await tx.engagement.create({
-      data: {
-        innovationId: innovation.id,
-        innovationVersionId: innovation.publishedVersion.id,
-        partnerId: partner.id,
-        type: input.type,
-        status: 'PENDING',
-        summary: input.summary,
-        termsSummary: input.termsSummary || null,
-        nonBindingAcceptedAt: new Date()
-      }
+  if (existing) throw new AppError(409, 'ENGAGEMENT_ALREADY_REQUESTED', 'You have already sent a collaboration request for this innovation. Only one request is allowed.');
+  let created;
+  try {
+    created = await prisma.$transaction(async (tx) => {
+      const record = await tx.engagement.create({
+        data: {
+          requestKey: `${innovation.id}:${partner.id}`,
+          innovationId: innovation.id,
+          innovationVersionId: innovation.publishedVersion.id,
+          partnerId: partner.id,
+          type: input.type,
+          status: 'PENDING',
+          summary: input.summary,
+          termsSummary: input.termsSummary || null,
+          nonBindingAcceptedAt: new Date()
+        }
+      });
+      await createNotification({
+        userId: innovation.ownerId,
+        type: 'ENGAGEMENT_REQUESTED',
+        title: 'New collaboration request',
+        message: `${partner.profile?.displayName ?? partner.email} sent a ${input.type.replaceAll('_', ' ').toLowerCase()} for ${innovation.publishedVersion.title}.`,
+        entityType: 'Engagement', entityId: record.id
+      }, tx);
+      return record;
     });
-    await createNotification({
-      userId: innovation.ownerId,
-      type: 'ENGAGEMENT_REQUESTED',
-      title: 'New collaboration request',
-      message: `${partner.profile?.displayName ?? partner.email} sent a ${input.type.replaceAll('_', ' ').toLowerCase()} for ${innovation.publishedVersion.title}.`,
-      entityType: 'Engagement', entityId: record.id
-    }, tx);
-    return record;
-  });
+  } catch (error) {
+    if (error?.code === 'P2002') {
+      throw new AppError(409, 'ENGAGEMENT_ALREADY_REQUESTED', 'You have already sent a collaboration request for this innovation. Only one request is allowed.');
+    }
+    throw error;
+  }
   return getEngagement(partner, created.id);
 }
 
@@ -94,25 +103,27 @@ export async function respondToEngagement(innovator, engagementId, input, reques
   const engagement = await findForParticipant(innovator, engagementId);
   if (engagement.innovation.ownerId !== innovator.id) throw new AppError(403, 'FORBIDDEN', 'Only the innovation owner can respond to this request.');
   if (!['PENDING', 'CLARIFICATION_REQUESTED'].includes(engagement.status)) throw new AppError(409, 'ENGAGEMENT_NOT_RESPONDABLE', 'This request is no longer awaiting an Innovator response.');
+  if (input.status === 'ACCEPTED' && !innovator.profile?.privatePhone?.trim()) {
+    throw new AppError(422, 'INNOVATOR_CONTACT_INCOMPLETE', 'Add a contact phone number to your profile before accepting this request.');
+  }
   await prisma.$transaction(async (tx) => {
     await tx.engagement.update({
       where: { id: engagementId },
-      data: { status: input.status, contactSharedAt: input.status === 'ACCEPTED' && (input.shareEmail || input.sharePhone) ? new Date() : null }
+      data: { status: input.status, contactSharedAt: input.status === 'ACCEPTED' ? new Date() : null }
     });
     await tx.engagementConsent.deleteMany({ where: { engagementId } });
     if (input.status === 'ACCEPTED') {
-      const scopes = [
-        ...(input.shareEmail ? ['SHARE_EMAIL'] : []),
-        ...(input.sharePhone ? ['SHARE_PHONE'] : []),
-        ...(innovator.profile?.organization ? ['SHARE_ORGANIZATION_CONTACT'] : [])
-      ];
-      if (scopes.length) await tx.engagementConsent.createMany({ data: scopes.map((scope) => ({ engagementId, userId: innovator.id, scope, grantedAt: new Date() })) });
+      await tx.engagementConsent.createMany({
+        data: ['SHARE_EMAIL', 'SHARE_PHONE'].map((scope) => ({ engagementId, userId: innovator.id, scope, grantedAt: new Date() }))
+      });
     }
     await createNotification({
       userId: engagement.partnerId,
       type: 'ENGAGEMENT_RESPONDED',
       title: 'Collaboration request updated',
-      message: `${engagement.innovationVersion.title} is now ${input.status.replaceAll('_', ' ').toLowerCase()}.`,
+      message: input.status === 'ACCEPTED'
+        ? `${engagement.innovationVersion.title} was accepted. The Innovator's email and phone are now available.`
+        : `${engagement.innovationVersion.title} is now ${input.status.replaceAll('_', ' ').toLowerCase()}.`,
       entityType: 'Engagement', entityId: engagementId
     }, tx);
   });

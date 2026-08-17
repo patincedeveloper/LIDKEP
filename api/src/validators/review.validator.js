@@ -13,7 +13,7 @@ export const saveReviewSchema = request({
   body: z.object({
     scores: z.array(score).min(1).max(20),
     rationale: z.string().trim().max(5000).optional(),
-    recommendation: z.enum(['APPROVE', 'REVISION_REQUIRED', 'REJECT']).optional(),
+    recommendation: z.enum(['APPROVE', 'REVISION_REQUIRED']).optional(),
     revisionRequests: z.array(revision).max(20).default([])
   }).strict()
 });

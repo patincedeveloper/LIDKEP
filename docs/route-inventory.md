@@ -16,8 +16,7 @@
 - `/innovator/innovations` — owned innovations
 - `/innovator/innovations/new` — create draft
 - `/innovator/innovations/:id` — edit, upload evidence, and submit
-- `/innovator/progress` — milestones and project updates
-- `/innovator/revisions` — expert feedback and responses
+- `/innovator/revisions` and `/innovator/revisions/:id` — versioned Expert feedback, responses, and revise action
 - `/innovator/collaborations` — Partner requests and Innovator decisions
 - `/innovator/notifications` — workflow notifications
 - `/innovator/profile` — profile information
@@ -27,9 +26,10 @@
 - `/admin/dashboard` — live prototype overview
 - `/admin/users` — account status management
 - `/admin/verifications` — role registration decisions
-- `/admin/innovations` — review, decision, publication, and archive
+- `/admin/innovations` — submitted innovation queue and workflow monitoring
+- `/admin/innovations/:id` — detail-first review, one-time Expert assignment, review history, and archive
 - `/admin/taxonomies` — sectors and classification lists
-- `/admin/criteria` — evaluation criteria versions
+- `/admin/criteria` — variable-count criteria builder, version history, and active-version switching
 - `/admin/reports` — prototype database summary
 - `/admin/settings` — prototype settings
 - `/admin/notifications` — workflow notifications
@@ -38,7 +38,7 @@
 
 - `/expert/dashboard` — assignment and notification summary
 - `/expert/assignments` — assigned review queue
-- `/expert/assignments/:id` — immutable submission reader, criteria scoring, comments, revisions, and recommendation
+- `/expert/assignments/:id` — immediate immutable submission review, scoring, comments, revision request, approval, and round history
 - `/expert/history` — submitted evaluation history
 - `/expert/notifications` — workflow notifications
 - `/expert/profile` — profile completion, review submission, and account state

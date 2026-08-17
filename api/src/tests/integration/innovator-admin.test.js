@@ -11,8 +11,15 @@ const innovatorEmail = `phase1-innovator-${suffix}@example.rw`;
 const expertEmail = `phase1-expert-${suffix}@example.rw`;
 const partnerEmail = `phase1-partner-${suffix}@example.rw`;
 const managedEmail = `admin-managed-${suffix}@example.rw`;
+const criteriaVersionLabel = `test-${suffix.slice(0, 8)}`;
 const password = 'ValidPassword@123';
+const narrative = (topic, count = 30) => Array.from(
+  { length: count },
+  (_, index) => `${topic}${index + 1}`
+).join(' ');
 const evidenceStorageKeys = [];
+let originalCriteriaId;
+let testCriteriaId;
 
 describe.sequential('Innovator and System Administrator prototype lifecycle', () => {
   const innovator = request.agent(app);
@@ -25,6 +32,8 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
   let innovatorUserId;
   let assignmentId;
   let engagementId;
+  let reviewEvidenceId;
+  let publicEvidenceId;
 
   it('registers an Innovator and persists a complete submitted innovation', async () => {
     const registration = await innovator.post('/api/v1/auth/register').send({
@@ -90,12 +99,19 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
     expect(draft.status).toBe(201);
     innovationId = draft.body.data.id;
 
+    const underWordLimit = await innovator.patch(`/api/v1/innovations/${innovationId}`).send({
+      problem: narrative('problem', 29)
+    });
+    expect(underWordLimit.status).toBe(422);
+    expect(underWordLimit.body.error.fieldErrors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ field: 'body.problem', message: 'Use at least 30 words.' })
+    ]));
     const overWordLimit = await innovator.patch(`/api/v1/innovations/${innovationId}`).send({
-      problem: Array.from({ length: 51 }, () => 'word').join(' ')
+      problem: narrative('problem', 1001)
     });
     expect(overWordLimit.status).toBe(422);
     expect(overWordLimit.body.error.fieldErrors).toEqual(expect.arrayContaining([
-      expect.objectContaining({ field: 'body.problem', message: 'Use 50 words or fewer.' })
+      expect.objectContaining({ field: 'body.problem', message: 'Use 1,000 words or fewer.' })
     ]));
 
     const incompleteSubmission = await innovator.post(`/api/v1/innovations/${innovationId}/submit`).send({});
@@ -111,7 +127,15 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
       .attach('file', Buffer.from('%PDF-1.4 prototype evidence'), { filename: 'prototype-evidence.pdf', contentType: 'application/pdf' });
     expect(evidenceUpload.status).toBe(201);
     expect(evidenceUpload.body.data.name).toBe('prototype-evidence.pdf');
+    reviewEvidenceId = evidenceUpload.body.data.id;
     evidenceStorageKeys.push((await prisma.evidenceFile.findUnique({ where: { id: evidenceUpload.body.data.id } })).storageKey);
+
+    const publicEvidenceUpload = await innovator.post(`/api/v1/innovations/${innovationId}/evidence`)
+      .field('visibility', 'PUBLIC')
+      .attach('file', Buffer.from('%PDF-1.4 public prototype summary'), { filename: 'public-prototype-summary.pdf', contentType: 'application/pdf' });
+    expect(publicEvidenceUpload.status).toBe(201);
+    publicEvidenceId = publicEvidenceUpload.body.data.id;
+    evidenceStorageKeys.push((await prisma.evidenceFile.findUnique({ where: { id: publicEvidenceId } })).storageKey);
 
     const videoUpload = await innovator.post(`/api/v1/innovations/${innovationId}/evidence`)
       .attach('file', Buffer.from('prototype video'), { filename: 'prototype.mp4', contentType: 'video/mp4' });
@@ -120,22 +144,22 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
 
     const updated = await innovator.patch(`/api/v1/innovations/${innovationId}`).send({
       title: 'Phase One Water Monitor',
-      summary: 'A community water quality monitoring prototype.',
-      problem: 'Communities need timely visibility into drinking water quality.',
-      solution: 'A simple sensor and reporting station records water quality indicators.',
-      beneficiaries: 'Community water users and local operators.',
+      summary: narrative('summary'),
+      problem: narrative('problem'),
+      solution: narrative('solution'),
+      beneficiaries: narrative('beneficiary'),
       sector: 'Water & Sanitation',
       category: 'Product innovation',
-      district: 'Gasabo',
+      district: 'District',
       maturity: 'M3 Prototype',
       impactArea: 'Health access',
-      impact: 'Improved awareness and faster response to water quality risks.',
-      novelty: 'Combines low-cost local sensing with a simple community reporting workflow.',
-      currentEvidence: 'A bench prototype has completed initial sensor readings.',
-      implementationPlan: 'Complete calibration, run a community pilot, and document results over three months.',
-      scalability: 'The modular station can be reproduced for other community water points.',
-      sustainability: 'Local operators can maintain the station using replaceable standard components.',
-      supportNeeded: 'Pilot testing support',
+      impact: narrative('impact'),
+      novelty: narrative('novelty'),
+      currentEvidence: narrative('evidence'),
+      implementationPlan: narrative('implementation'),
+      scalability: narrative('scalability'),
+      sustainability: narrative('sustainability'),
+      supportNeeded: narrative('support'),
       ownershipDeclared: true,
       accuracyDeclared: true
     });
@@ -149,7 +173,7 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
     const lockedEdit = await innovator.patch(`/api/v1/innovations/${innovationId}`).send({ title: 'Not allowed after submission' });
     expect(lockedEdit.status).toBe(409);
     expect(lockedEdit.body.error.code).toBe('INNOVATION_NOT_EDITABLE');
-  });
+  }, 30000);
 
   it('registers an Expert into the System Administrator approval queue', async () => {
     const response = await expert.post('/api/v1/auth/register').send({
@@ -172,6 +196,33 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
     verificationId = record.id;
   });
 
+  it('allows the System Administrator to create and switch the active criteria version', async () => {
+    const before = await administrator.get('/api/v1/admin/criteria');
+    expect(before.status).toBe(200);
+    originalCriteriaId = before.body.data.find((item) => item.status === 'ACTIVE')?.id;
+    expect(originalCriteriaId).toBeTruthy();
+
+    const created = await administrator.post('/api/v1/admin/criteria').send({
+      version: criteriaVersionLabel,
+      name: 'Lifecycle test evaluation',
+      criteria: [
+        { name: 'Need and relevance', guidance: 'Assess the evidenced need.', weight: 40 },
+        { name: 'Delivery feasibility', guidance: 'Assess delivery readiness.', weight: 35 },
+        { name: 'Expected impact', guidance: 'Assess likely beneficiary outcomes.', weight: 25 }
+      ]
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.data.status).toBe('DRAFT');
+    expect(created.body.data.criteria).toHaveLength(3);
+    testCriteriaId = created.body.data.id;
+
+    const activated = await administrator.post(`/api/v1/admin/criteria/${testCriteriaId}/activate`).send({});
+    expect(activated.status).toBe(200);
+    expect(activated.body.data.status).toBe('ACTIVE');
+    expect((await prisma.evaluationCriteriaVersion.findUnique({ where: { id: originalCriteriaId } })).status).toBe('RETIRED');
+    expect(await prisma.evaluationCriteriaVersion.count({ where: { status: 'ACTIVE' } })).toBe(1);
+  });
+
   it('allows the System Administrator to approve and assign the Expert', async () => {
     const reviewedApplication = await administrator.get(`/api/v1/admin/verifications/${verificationId}`);
     expect(reviewedApplication.status).toBe(200);
@@ -182,11 +233,23 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
     expect(verification.status).toBe(200);
 
     const expertUser = await prisma.user.findUnique({ where: { email: expertEmail } });
-    await prisma.innovation.update({ where: { id: innovationId }, data: { status: 'PUBLISHED' } });
+    const prematureAssignment = await administrator.post(`/api/v1/admin/innovations/${innovationId}/assignments`).send({ expertId: expertUser.id });
+    expect(prematureAssignment.status).toBe(409);
+    expect(prematureAssignment.body.error.code).toBe('INNOVATION_REVIEW_REQUIRED');
+
+    const reviewedInnovation = await administrator.get(`/api/v1/admin/innovations/${innovationId}`);
+    expect(reviewedInnovation.status).toBe(200);
+    expect(reviewedInnovation.body.data.administratorReviewedAt).not.toBe('');
     const assigned = await administrator.post(`/api/v1/admin/innovations/${innovationId}/assignments`).send({ expertId: expertUser.id });
     expect(assigned.status).toBe(201);
     assignmentId = assigned.body.data.id;
-    expect((await prisma.innovation.findUnique({ where: { id: innovationId } })).status).toBe('PUBLISHED');
+    expect((await prisma.innovation.findUnique({ where: { id: innovationId } })).status).toBe('UNDER_REVIEW');
+    expect((await prisma.review.findFirst({ where: { assignmentId } })).criteriaVersionId).toBe(testCriteriaId);
+
+    const switched = await administrator.post(`/api/v1/admin/criteria/${originalCriteriaId}/activate`).send({});
+    expect(switched.status).toBe(200);
+    expect(switched.body.data.status).toBe('ACTIVE');
+    expect(await prisma.evaluationCriteriaVersion.count({ where: { status: 'ACTIVE' } })).toBe(1);
 
     const notification = await prisma.notification.findFirst({
       where: { userId: expertUser.id, type: 'EXPERT_ASSIGNMENT_CREATED', entityId: assignmentId }
@@ -196,11 +259,21 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
     const expertWorkspace = await expert.get('/api/v1/auth/bootstrap');
     expect(expertWorkspace.status).toBe(200);
     expect(expertWorkspace.body.data.assignments).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: assignmentId, innovation: 'Phase One Water Monitor' })
+      expect.objectContaining({ id: assignmentId, innovation: 'Phase One Water Monitor', status: 'ASSIGNED' })
     ]));
+    expect(expertWorkspace.body.data.assignments.find((item) => item.id === assignmentId).criteria).toHaveLength(3);
+    const expertAssignment = expertWorkspace.body.data.assignments.find((item) => item.id === assignmentId);
+    expect(expertAssignment.supportingLinks).toEqual([
+      { title: 'Prototype notes', url: 'https://example.com/water-monitor' }
+    ]);
+    expect(expertAssignment.evidence.map((file) => file.id)).toEqual(expect.arrayContaining([reviewEvidenceId, publicEvidenceId]));
+    expect((await expert.get(`/api/v1/innovations/${innovationId}/evidence/${reviewEvidenceId}/download`)).status).toBe(200);
     expect(expertWorkspace.body.data.notifications).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'EXPERT_ASSIGNMENT_CREATED' })
+      expect.objectContaining({ type: 'EXPERT_ASSIGNMENT_CREATED', actionPath: `/expert/assignments/${assignmentId}` })
     ]));
+    const assignmentNotification = expertWorkspace.body.data.notifications.find((item) => item.type === 'EXPERT_ASSIGNMENT_CREATED');
+    expect((await expert.post(`/api/v1/users/me/notifications/${assignmentNotification.id}/read`).send({})).status).toBe(200);
+    expect((await expert.get('/api/v1/auth/bootstrap')).body.data.notifications.find((item) => item.id === assignmentNotification.id).read).toBe(true);
 
     const duplicate = await administrator.post(`/api/v1/admin/innovations/${innovationId}/assignments`).send({ expertId: expertUser.id });
     expect(duplicate.status).toBe(409);
@@ -208,13 +281,58 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
     expect(await prisma.expertAssignment.count({ where: { innovationId } })).toBe(1);
   });
 
-  it('allows the approved Expert to score and submit a recommendation before final publication', async () => {
-    const accepted = await expert.post(`/api/v1/reviews/assignments/${assignmentId}/accept`).send({});
-    expect(accepted.status).toBe(200);
-    const criteria = accepted.body.data.criteria;
+  it('supports revision and approval rounds without assignment acceptance or an administrator publication decision', async () => {
+    expect((await expert.post(`/api/v1/reviews/assignments/${assignmentId}/accept`).send({})).status).toBe(404);
+    const opened = await expert.get(`/api/v1/reviews/assignments/${assignmentId}`);
+    expect(opened.status).toBe(200);
+    const criteria = opened.body.data.criteria;
     expect(criteria.length).toBeGreaterThan(1);
+    const rejected = await expert.put(`/api/v1/reviews/assignments/${assignmentId}`).send({
+      scores: criteria.map((criterion) => ({ criterionKey: criterion.key, score: 2, comment: 'More evidence is needed.' })),
+      rationale: 'This legacy rejection choice must not be accepted.',
+      recommendation: 'REJECT',
+      revisionRequests: []
+    });
+    expect(rejected.status).toBe(422);
+
+    const savedRevision = await expert.put(`/api/v1/reviews/assignments/${assignmentId}`).send({
+      scores: criteria.map((criterion) => ({ criterionKey: criterion.key, score: 3, comment: 'Improve the implementation evidence.' })),
+      rationale: 'The solution is promising but the implementation plan needs a clearer pilot sequence.',
+      recommendation: 'REVISION_REQUIRED',
+      revisionRequests: [{ fieldKey: 'implementationPlan', instruction: 'Describe the pilot sequence and measurement checkpoints.' }]
+    });
+    expect(savedRevision.status).toBe(200);
+    expect(savedRevision.body.data.review.totalScore).toBe(60);
+    const submittedRevision = await expert.post(`/api/v1/reviews/assignments/${assignmentId}/submit`).send({});
+    expect(submittedRevision.status).toBe(200);
+    expect(submittedRevision.body.data.status).toBe('REVISION_REQUESTED');
+    expect((await prisma.innovation.findUnique({ where: { id: innovationId } })).status).toBe('REVISION_REQUIRED');
+
+    const feedback = await innovator.get('/api/v1/innovations/feedback');
+    expect(feedback.status).toBe(200);
+    expect(feedback.body.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ innovationId, rounds: [expect.objectContaining({ recommendation: 'REVISION_REQUIRED', version: 1 })] })
+    ]));
+
+    expect((await innovator.patch(`/api/v1/innovations/${innovationId}`).send({
+      implementationPlan: narrative('revised-implementation')
+    })).status).toBe(200);
+    const resubmitted = await innovator.post(`/api/v1/innovations/${innovationId}/submit`).send({});
+    expect(resubmitted.status).toBe(200);
+    expect(resubmitted.body.data.status).toBe('UNDER_REVIEW');
+    expect(resubmitted.body.data.version).toBe(2);
+    expect(await prisma.expertAssignment.count({ where: { innovationId } })).toBe(1);
+    expect(await prisma.review.count({ where: { assignmentId } })).toBe(2);
+    expect(new Set((await prisma.review.findMany({ where: { assignmentId } })).map((review) => review.criteriaVersionId))).toEqual(new Set([testCriteriaId]));
+    expect(await prisma.revisionRequest.count({ where: { review: { assignmentId }, status: 'RESOLVED' } })).toBe(1);
+
+    const reopened = await expert.get(`/api/v1/reviews/assignments/${assignmentId}`);
+    expect(reopened.body.data.status).toBe('ASSIGNED');
+    expect(reopened.body.data.version).toBe(2);
+    expect(reopened.body.data.reviewHistory).toHaveLength(1);
+    const revisedCriteria = reopened.body.data.criteria;
     const saved = await expert.put(`/api/v1/reviews/assignments/${assignmentId}`).send({
-      scores: criteria.map((criterion) => ({ criterionKey: criterion.key, score: 4, comment: 'Evidence supports this criterion.' })),
+      scores: revisedCriteria.map((criterion) => ({ criterionKey: criterion.key, score: 4, comment: 'The revised evidence supports this criterion.' })),
       rationale: 'The submitted evidence and implementation plan support a positive recommendation.',
       recommendation: 'APPROVE',
       revisionRequests: []
@@ -224,14 +342,19 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
     const submittedReview = await expert.post(`/api/v1/reviews/assignments/${assignmentId}/submit`).send({});
     expect(submittedReview.status).toBe(200);
     expect(submittedReview.body.data.status).toBe('COMPLETED');
-
-    const approve = await administrator.post(`/api/v1/admin/innovations/${innovationId}/decision`).send({ status: 'APPROVED', reason: 'Expert recommendation and evidence support approval.' });
-    expect(approve.status).toBe(200);
-    const publish = await administrator.post(`/api/v1/admin/innovations/${innovationId}/decision`).send({ status: 'PUBLISHED', reason: 'Approved record is ready for public discovery.' });
-    expect(publish.status).toBe(200);
-    const publicRecord = await request(app).get(`/api/v1/public/innovations/${publish.body.data.slug}`);
+    const published = await prisma.innovation.findUnique({ where: { id: innovationId }, include: { publishedVersion: true } });
+    expect(published.status).toBe('PUBLISHED');
+    expect(published.publishedVersion.versionNumber).toBe(2);
+    expect((await administrator.post(`/api/v1/admin/innovations/${innovationId}/decision`).send({ status: 'PUBLISHED' })).status).toBe(404);
+    const publicRecord = await request(app).get(`/api/v1/public/innovations/${published.slug}`);
     expect(publicRecord.status).toBe(200);
     expect(publicRecord.body.data.title).toBe('Phase One Water Monitor');
+    expect(publicRecord.body.data.supportingLinks).toEqual([
+      { title: 'Prototype notes', url: 'https://example.com/water-monitor' }
+    ]);
+    expect(publicRecord.body.data.evidence.map((file) => file.id)).toEqual([publicEvidenceId]);
+    expect((await request(app).get(`/api/v1/public/innovations/${published.slug}/evidence/${publicEvidenceId}/download`)).status).toBe(200);
+    expect((await request(app).get(`/api/v1/public/innovations/${published.slug}/evidence/${reviewEvidenceId}/download`)).status).toBe(404);
   });
 
   it('allows an approved Partner to request collaboration and receive consented contact details', async () => {
@@ -247,6 +370,13 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
     expect((await administrator.get(`/api/v1/admin/verifications/${partnerVerification.id}`)).status).toBe(200);
     expect((await administrator.post(`/api/v1/admin/verifications/${partnerVerification.id}/decision`).send({ decision: 'APPROVE' })).status).toBe(200);
 
+    const partnerWorkspace = await partner.get('/api/v1/auth/bootstrap');
+    const partnerInnovation = partnerWorkspace.body.data.innovations.find((item) => item.id === innovationId);
+    expect(partnerInnovation.supportingLinks).toEqual([
+      { title: 'Prototype notes', url: 'https://example.com/water-monitor' }
+    ]);
+    expect(partnerInnovation.evidence.map((file) => file.id)).toEqual([publicEvidenceId]);
+
     const created = await partner.post('/api/v1/engagements').send({
       innovationId,
       type: 'FUNDING_OFFER',
@@ -258,14 +388,33 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
     expect(created.body.data.status).toBe('PENDING');
     engagementId = created.body.data.id;
 
-    const response = await innovator.post(`/api/v1/engagements/${engagementId}/respond`).send({ status: 'ACCEPTED', shareEmail: true, sharePhone: false });
+    const response = await innovator.post(`/api/v1/engagements/${engagementId}/respond`).send({ status: 'ACCEPTED' });
     expect(response.status).toBe(200);
     const opportunities = await partner.get('/api/v1/engagements');
     expect(opportunities.status).toBe(200);
     const accepted = opportunities.body.data.find((item) => item.id === engagementId);
     expect(accepted.status).toBe('ACCEPTED');
     expect(accepted.contact.email).toBe(innovatorEmail);
-    expect(accepted.contact.phone).toBe('');
+    expect(accepted.contact.phone).toBe('+250788123456');
+
+    const repeatedAfterAcceptance = await partner.post('/api/v1/engagements').send({
+      innovationId,
+      type: 'CONTACT',
+      summary: 'This second request must remain blocked after acceptance.',
+      nonBindingAccepted: true
+    });
+    expect(repeatedAfterAcceptance.status).toBe(409);
+    expect(repeatedAfterAcceptance.body.error.code).toBe('ENGAGEMENT_ALREADY_REQUESTED');
+
+    await prisma.engagement.update({ where: { id: engagementId }, data: { status: 'DECLINED' } });
+    const repeatedAfterDecline = await partner.post('/api/v1/engagements').send({
+      innovationId,
+      type: 'PARTNERSHIP_REQUEST',
+      summary: 'This second request must remain blocked after a decline.',
+      nonBindingAccepted: true
+    });
+    expect(repeatedAfterDecline.status).toBe(409);
+    expect(repeatedAfterDecline.body.error.code).toBe('ENGAGEMENT_ALREADY_REQUESTED');
   });
 
   it('allows the System Administrator to CRUD users and innovations', async () => {
@@ -296,14 +445,27 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
     const createdInnovation = await administrator.post('/api/v1/admin/innovations').send({
       ownerId: innovatorUserId,
       title: 'Administrator Created Draft',
-      summary: 'Created for lifecycle verification.'
+      summary: narrative('admin-summary')
     });
     expect(createdInnovation.status).toBe(201);
     const managedInnovationId = createdInnovation.body.data.id;
     const updatedInnovation = await administrator.patch(`/api/v1/innovations/${managedInnovationId}`).send({ title: 'Administrator Updated Draft' });
     expect(updatedInnovation.status).toBe(200);
     expect(updatedInnovation.body.data.title).toBe('Administrator Updated Draft');
+
+    await prisma.innovationVersion.update({
+      where: { id: createdInnovation.body.data.versionId },
+      data: { submittedAt: new Date(), immutableAt: new Date() }
+    });
+    await prisma.innovation.update({ where: { id: managedInnovationId }, data: { status: 'SUBMITTED' } });
+
+    await expect(prisma.innovationVersion.delete({
+      where: { id: createdInnovation.body.data.versionId }
+    })).rejects.toThrow('submitted innovation versions are immutable');
+
     expect((await administrator.delete(`/api/v1/admin/innovations/${managedInnovationId}`)).status).toBe(200);
+    expect(await prisma.innovation.findUnique({ where: { id: managedInnovationId } })).toBeNull();
+    expect(await prisma.innovationVersion.findUnique({ where: { id: createdInnovation.body.data.versionId } })).toBeNull();
   });
 });
 
@@ -328,11 +490,23 @@ afterAll(async () => {
     await tx.revisionRequest.deleteMany({ where: { OR: [{ reviewId: { in: reviewIds } }, { versionId: { in: versionIds } }] } });
     await tx.review.deleteMany({ where: { id: { in: reviewIds } } });
     await tx.expertAssignment.deleteMany({ where: { id: { in: assignmentIds } } });
+    if (originalCriteriaId) {
+      await tx.evaluationCriteriaVersion.updateMany({
+        where: { status: 'ACTIVE', id: { not: originalCriteriaId } },
+        data: { status: 'RETIRED', retiredAt: new Date() }
+      });
+      await tx.evaluationCriteriaVersion.update({
+        where: { id: originalCriteriaId },
+        data: { status: 'ACTIVE', activatedAt: new Date(), retiredAt: null }
+      });
+    }
+    if (testCriteriaId) await tx.evaluationCriteriaVersion.deleteMany({ where: { id: testCriteriaId } });
     await tx.evidenceFile.deleteMany({ where: { OR: [{ innovationVersionId: { in: versionIds } }, { uploadedById: { in: userIds } }] } });
     await tx.milestone.deleteMany({ where: { innovationId: { in: innovationIds } } });
     await tx.verificationRequest.deleteMany({ where: { userId: { in: userIds } } });
     await tx.notification.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { entityId: { in: [...userIds, ...innovationIds] } }] } });
     await tx.session.deleteMany({ where: { userId: { in: userIds } } });
+    await tx.innovationAdministratorReview.deleteMany({ where: { OR: [{ innovationId: { in: innovationIds } }, { versionId: { in: versionIds } }] } });
     await tx.innovation.updateMany({ where: { id: { in: innovationIds } }, data: { publishedVersionId: null } });
     await tx.innovationVersion.deleteMany({ where: { id: { in: versionIds } } });
     await tx.innovation.deleteMany({ where: { id: { in: innovationIds } } });

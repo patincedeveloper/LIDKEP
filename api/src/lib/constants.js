@@ -11,9 +11,6 @@ export const INNOVATION_STATUSES = Object.freeze([
   'SUBMITTED',
   'UNDER_REVIEW',
   'REVISION_REQUIRED',
-  'RECOMMENDED',
-  'APPROVED',
-  'REJECTED',
   'ARCHIVED',
   'PUBLISHED'
 ]);

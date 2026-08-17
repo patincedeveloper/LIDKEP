@@ -18,8 +18,9 @@ export const decideVerification = async (req, res) => {
   res.json(successResponse(req, { decided: true }));
 };
 export const innovations = async (req, res) => res.json(successResponse(req, await adminService.listInnovations()));
+export const innovation = async (req, res) => res.json(successResponse(req, await adminService.getInnovationForReview(req.user, req.validated.params.id)));
 export const createInnovation = async (req, res) => res.status(201).json(successResponse(req, await adminService.createInnovation(req.user, req.validated.body, req.requestId)));
-export const decideInnovation = async (req, res) => res.json(successResponse(req, await adminService.decideInnovation(req.user, req.validated.params.id, req.validated.body, req.requestId)));
+export const archiveInnovation = async (req, res) => res.json(successResponse(req, await adminService.archiveInnovation(req.user, req.validated.params.id, req.requestId)));
 export const assignExpert = async (req, res) => res.status(201).json(successResponse(req, await adminService.assignExpert(req.user, req.validated.params.id, req.validated.body, req.requestId)));
 export const deleteInnovation = async (req, res) => {
   await adminService.deleteInnovation(req.user, req.validated.params.id, req.requestId);
@@ -30,6 +31,7 @@ export const createTaxonomy = async (req, res) => res.status(201).json(successRe
 export const updateTaxonomy = async (req, res) => res.json(successResponse(req, await adminService.updateTaxonomy(req.user, req.validated.params.id, req.validated.body, req.requestId)));
 export const criteria = async (req, res) => res.json(successResponse(req, await adminService.listCriteria()));
 export const createCriteria = async (req, res) => res.status(201).json(successResponse(req, await adminService.createCriteria(req.user, req.validated.body, req.requestId)));
+export const activateCriteria = async (req, res) => res.json(successResponse(req, await adminService.activateCriteria(req.user, req.validated.params.id, req.requestId)));
 export const report = async (req, res) => res.json(successResponse(req, await adminService.getReport()));
 export const settings = async (req, res) => res.json(successResponse(req, await adminService.getSettings()));
 export const updateSettings = async (req, res) => res.json(successResponse(req, await adminService.updateSettings(req.user, req.validated.body, req.requestId)));

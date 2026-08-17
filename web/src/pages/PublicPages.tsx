@@ -26,6 +26,10 @@ import { usePlatform } from "../api";
 import { palette } from "../styles";
 import type { Innovation, Role } from "../types";
 import {
+  fullNameIsValid,
+  projectCoverageLevels,
+} from "../validation";
+import {
   Brand,
   Button,
   ButtonLink,
@@ -134,7 +138,7 @@ export function HomePage() {
         <ImpactBand>
           {[
             [data!.statistics.publishedInnovations, "published innovations"],
-            [data!.statistics.districtsReached, "districts represented"],
+            [data!.statistics.districtsReached, "coverage levels represented"],
             [data!.statistics.activeExperts, "verified experts"],
             [data!.statistics.collaborationRequests, "connections enabled"],
           ].map(([value, label]) => (
@@ -298,12 +302,12 @@ export function DirectoryPage() {
             ))}
           </Select>
           <Select
-            aria-label="District filter"
+            aria-label="Project coverage filter"
             value={district}
             onChange={(e) => setDistrict(e.target.value)}
           >
-            <option value="">All districts</option>
-            {data!.taxonomies.districts.map((v) => (
+            <option value="">All coverage levels</option>
+            {projectCoverageLevels.map((v) => (
               <option key={v}>{v}</option>
             ))}
           </Select>
@@ -334,7 +338,7 @@ export function DirectoryPage() {
         ) : (
           <EmptyState
             title="No innovation matches those filters"
-            copy="Try a broader keyword, another district, or reset all filters."
+            copy="Try a broader keyword, another coverage level, or reset all filters."
             action={<Button onClick={clear}>Reset filters</Button>}
           />
         )}
@@ -427,6 +431,39 @@ export function InnovationDetailPage() {
                   </div>
                 ))}
               </Timeline>
+            </ContentSection>
+            <ContentSection>
+              <Eyebrow>Supporting materials</Eyebrow>
+              <h2>Documents and links</h2>
+              {item.supportingLinks.length || item.evidence.length ? (
+                <ResourceList>
+                  {item.supportingLinks.map((link) => (
+                    <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
+                      <FileText size={18} />
+                      <span>
+                        <strong>{link.title}</strong>
+                        <small>Open supporting link</small>
+                      </span>
+                      <ArrowRight size={17} />
+                    </a>
+                  ))}
+                  {item.evidence.map((file) => (
+                    <a
+                      key={file.id}
+                      href={`/api/v1/public/innovations/${item.slug}/evidence/${file.id}/download`}
+                    >
+                      <FileText size={18} />
+                      <span>
+                        <strong>{file.name}</strong>
+                        <small>{file.mimeType}</small>
+                      </span>
+                      <ArrowRight size={17} />
+                    </a>
+                  ))}
+                </ResourceList>
+              ) : (
+                <p>No public supporting documents or links were attached.</p>
+              )}
             </ContentSection>
           </article>
           <aside>
@@ -521,7 +558,7 @@ export function StatisticsPage() {
             icon={<Leaf size={18} />}
           />
           <StatCard
-            label="Districts represented"
+            label="Coverage levels represented"
             value={stats.districtsReached}
             icon={<MapPin size={18} />}
           />
@@ -624,10 +661,17 @@ export function AuthPage({ mode }: { mode: "login" | "register" | "reset" }) {
         navigate(destination(user.role));
         return;
       }
+      const displayName = String(form.get("displayName"));
+      if (!fullNameIsValid(displayName)) {
+        setFormError(
+          "Full name must use letters, spaces, apostrophes, or hyphens only.",
+        );
+        return;
+      }
       const result = await register({
         email: String(form.get("email")),
         password: String(form.get("password")),
-        displayName: String(form.get("displayName")),
+        displayName,
         role: role as Exclude<Role, "SYSTEM_ADMINISTRATOR">,
       });
       if (result.requiresApproval) {
@@ -743,6 +787,8 @@ export function AuthPage({ mode }: { mode: "login" | "register" | "reset" }) {
                   <Input
                     name="displayName"
                     required
+                    minLength={2}
+                    maxLength={120}
                     placeholder="Enter your names as shown on your identification"
                     autoComplete="name"
                   />
@@ -1511,6 +1557,43 @@ const Timeline = styled.div`
   }
   small {
     color: ${palette.muted};
+  }
+`;
+const ResourceList = styled.div`
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  a {
+    min-height: 64px;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) 20px;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid ${palette.line};
+    border-radius: 12px;
+    background: white;
+    color: ${palette.ink};
+    text-decoration: none;
+  }
+  a:hover {
+    border-color: ${palette.green};
+    background: ${palette.soft};
+  }
+  span {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  strong,
+  small {
+    overflow-wrap: anywhere;
+  }
+  small {
+    color: ${palette.muted};
+  }
+  svg {
+    color: ${palette.green};
   }
 `;
 const SnapshotList = styled.div`

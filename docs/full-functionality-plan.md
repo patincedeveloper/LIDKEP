@@ -45,11 +45,10 @@ Status: implemented and covered by database-backed integration tests.
 | Overview | Owned innovation, draft, feedback, and notification counts | Counts come from the signed-in user's PostgreSQL records |
 | My innovations | List only owned records and create a draft | Another Innovator cannot retrieve the record |
 | Innovation editor | Save structured problem, solution, beneficiaries, classifications, impact, and support needs | Reload shows the saved values |
-| Evidence | Upload PDF, DOCX, XLSX, image, or MP4 with visibility | Authorized download returns the stored file |
+| Evidence | Upload PDF, DOCX, XLSX, image, or MP4 with visibility and add supporting links | Owner and Administrator retain access, assigned Expert receives review-team files, and published pages expose only public files |
 | Submission | Validate required fields and declarations; freeze submitted version | Incomplete records fail; complete records become `SUBMITTED` |
-| Project progress | Add milestone title, description, date, status, and visibility | Update persists and appears after reload |
-| Expert feedback | Display revision requests and store responses | Response is tied to the reviewed version |
-| Notifications | Display status and approval messages and mark them read | Read state persists |
+| Expert feedback | Display versioned scores, recommendation, rationale, comments, revisions, and responses | Every review round remains available after resubmission |
+| Notifications | Display linked workflow messages and mark all or individual items read | Read state persists and actions open the related record |
 | Profile | Update identity, organization, district, biography, and language | Values persist and workspace identity refreshes |
 
 ### 3.2 System Administrator pages and functions
@@ -59,11 +58,11 @@ Status: implemented and covered by database-backed integration tests.
 | Overview | Live user, approval, innovation and publication counts | No fixed demo totals |
 | Users | View safe fields; activate, suspend, or disable | Status is server-enforced and sessions are revoked when necessary |
 | Account approvals | Approve or reject Innovator, Expert, and Partner registrations | Approved user can sign in; rejected user cannot |
-| Innovations | Review all records and apply validated decisions | Invalid status transitions fail on the server |
-| Publication | Publish only an approved immutable version | Public slug returns only the selected published version |
+| Innovations | Open the complete submitted version before assigning one Expert | Assignment fails until the detail review is recorded |
+| Publication | Monitor automatic publication after an Expert recommends approval | Public slug returns the exact reviewed version |
 | Sectors and categories | Add and activate/deactivate classifications | Registration/editor filters use active values |
-| Evaluation criteria | View versions and create weighted drafts totaling 100% | Invalid totals are rejected |
-| Content moderation | Reject or archive an innovation with a reason | Innovator is notified of the decision |
+| Evaluation criteria | Create 2–12 named criteria with guidance and weights, then activate or reactivate a version | Exactly one version is active, weights total 100%, and existing assignments retain their frozen version |
+| Content moderation | Archive an innovation while retaining workflow history | Innovator is notified of the archive |
 | Reports | Show simple users/innovation database summaries | Values match database counts |
 | Settings | Save the small prototype configuration set | Settings persist in PostgreSQL |
 
@@ -76,7 +75,8 @@ Before starting Expert work, confirm:
 - Innovator create → save → reload → submit works.
 - Incomplete submission is rejected.
 - Evidence and milestone records remain after reload.
-- System Administrator can approve and then publish.
+- System Administrator detail review is required before Expert assignment.
+- Expert approval publishes the reviewed version without an Administrator decision.
 - Published innovation appears in public discovery.
 - Suspension blocks an existing account session.
 - Management decisions notify the affected user and persist their workflow state.
@@ -101,17 +101,16 @@ Status: implemented and covered by the four-role lifecycle integration test.
 ### Workflow
 
 1. System Administrator assigns a submitted immutable version to an approved Expert.
-2. Expert accepts the assignment.
-3. Expert completes the checklist and criterion scores.
-4. Expert saves a draft review.
-5. Expert requests revisions or submits approve/reject/revision recommendation.
-6. Innovator receives comments and responds.
-7. System Administrator sees the recommendation but remains the final decision maker.
+2. Assignment changes the innovation to `UNDER_REVIEW`; no Expert acceptance is required.
+3. Expert completes the checklist and criterion scores and saves a draft review.
+4. Request revisions returns the innovation to its owner with versioned feedback.
+5. Innovator improves and resubmits; the same Expert receives the new immutable version.
+6. Recommend approval publishes that reviewed version automatically.
 
 ### Prototype limits
 
-- One active assignment per Expert and version.
-- One criteria version per review.
+- One locked Expert assignment per innovation, reused across revision rounds.
+- One immutable review per assignment and submitted version.
 - No automatic AI scoring, matching, or recommendation.
 - No advanced reviewer performance analytics.
 
@@ -136,7 +135,7 @@ Status: implemented and covered by the four-role lifecycle integration test.
 2. Partner creates a contact, funding, or partnership request.
 3. Request is explicitly non-binding and does not transfer funds.
 4. Innovator accepts, declines, or requests clarification.
-5. Contact information is shown only after consent.
+5. Acceptance grants that requesting Partner access to the Innovator email and phone.
 6. Both parties track the opportunity status.
 
 ### Prototype limits

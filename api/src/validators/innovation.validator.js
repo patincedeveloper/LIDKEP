@@ -1,15 +1,11 @@
 import { z } from 'zod';
+import { optionalNarrative, projectCoverageSchema } from './common.validator.js';
 
 const request = ({ body = z.unknown().optional(), params = z.object({}).strict(), query = z.object({}).strict() } = {}) =>
   z.object({ body, params, query });
 
 const idParams = z.object({ id: z.string().uuid() }).strict();
 const optionalText = (maximum) => z.string().trim().max(maximum).optional();
-const countWords = (value) => value.trim().split(/\s+/).filter(Boolean).length;
-const optionalNarrative = (maximum) => optionalText(maximum).refine(
-  (value) => value === undefined || countWords(value) <= 50,
-  'Use 50 words or fewer.'
-);
 const supportingLink = z.object({
   title: z.string().trim().min(2).max(120),
   url: z.string().trim().url().refine((value) => /^https?:\/\//i.test(value), 'Use an http:// or https:// link.')
@@ -18,22 +14,22 @@ const supportingLink = z.object({
 export const createInnovationSchema = request({
   body: z.object({
     title: z.string().trim().min(3).max(180),
-    summary: optionalNarrative(600),
-    problem: optionalNarrative(5000),
-    solution: optionalNarrative(5000),
-    beneficiaries: optionalNarrative(3000),
+    summary: optionalNarrative(),
+    problem: optionalNarrative(),
+    solution: optionalNarrative(),
+    beneficiaries: optionalNarrative(),
     sector: optionalText(120),
     category: optionalText(120),
-    district: optionalText(120),
+    district: projectCoverageSchema.optional(),
     maturity: optionalText(120),
     impactArea: optionalText(120),
-    impact: optionalNarrative(3000),
-    novelty: optionalNarrative(3000),
-    currentEvidence: optionalNarrative(3000),
-    implementationPlan: optionalNarrative(3000),
-    scalability: optionalNarrative(3000),
-    sustainability: optionalNarrative(3000),
-    supportNeeded: optionalNarrative(2000),
+    impact: optionalNarrative(),
+    novelty: optionalNarrative(),
+    currentEvidence: optionalNarrative(),
+    implementationPlan: optionalNarrative(),
+    scalability: optionalNarrative(),
+    sustainability: optionalNarrative(),
+    supportNeeded: optionalNarrative(),
     supportingLinks: z.array(supportingLink).max(10).optional(),
     ownershipDeclared: z.boolean().optional(),
     accuracyDeclared: z.boolean().optional()
@@ -43,12 +39,12 @@ export const createInnovationSchema = request({
 export const updateInnovationSchema = request({
   params: idParams,
   body: z.object({
-    title: optionalText(180), summary: optionalNarrative(600), problem: optionalNarrative(5000),
-    solution: optionalNarrative(5000), beneficiaries: optionalNarrative(3000), sector: optionalText(120),
-    category: optionalText(120), district: optionalText(120), maturity: optionalText(120),
-    impactArea: optionalText(120), impact: optionalNarrative(3000), novelty: optionalNarrative(3000),
-    currentEvidence: optionalNarrative(3000), implementationPlan: optionalNarrative(3000),
-    scalability: optionalNarrative(3000), sustainability: optionalNarrative(3000), supportNeeded: optionalNarrative(2000),
+    title: optionalText(180), summary: optionalNarrative(), problem: optionalNarrative(),
+    solution: optionalNarrative(), beneficiaries: optionalNarrative(), sector: optionalText(120),
+    category: optionalText(120), district: projectCoverageSchema.optional(), maturity: optionalText(120),
+    impactArea: optionalText(120), impact: optionalNarrative(), novelty: optionalNarrative(),
+    currentEvidence: optionalNarrative(), implementationPlan: optionalNarrative(),
+    scalability: optionalNarrative(), sustainability: optionalNarrative(), supportNeeded: optionalNarrative(),
     supportingLinks: z.array(supportingLink).max(10).optional(),
     ownershipDeclared: z.boolean().optional(), accuracyDeclared: z.boolean().optional()
   }).strict().refine((value) => Object.keys(value).length > 0, 'Provide at least one field to update.')

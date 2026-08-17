@@ -17,7 +17,6 @@ import {
   FolderKanban,
   Gauge,
   Handshake,
-  Layers3,
   Leaf,
   Link2,
   LockKeyhole,
@@ -51,8 +50,15 @@ import type {
   Assignment,
   Engagement,
   Innovation,
+  InnovationFeedback,
   Role,
 } from "../types";
+import {
+  countWords,
+  fullNameIsValid,
+  identificationNumberError,
+  projectCoverageLevels,
+} from "../validation";
 import {
   Brand,
   Button,
@@ -119,9 +125,18 @@ type CriteriaVersion = {
   id: string;
   version: string;
   name: string;
-  status: string;
-  criteria: Array<{ name: string; guidance: string; weight: number }>;
+  status: "DRAFT" | "ACTIVE" | "RETIRED";
+  activatedAt: string;
+  retiredAt: string;
+  createdAt: string;
+  criteria: Array<{
+    id: string;
+    name: string;
+    guidance: string;
+    weight: number;
+  }>;
 };
+type CriteriaDraftItem = { name: string; guidance: string; weight: number };
 type SettingsData = {
   publicStatistics: boolean;
   allowComments: boolean;
@@ -150,7 +165,6 @@ const navigation: Record<
   innovator: [
     { label: "Overview", section: "dashboard", icon: <Gauge /> },
     { label: "My innovations", section: "innovations", icon: <FolderKanban /> },
-    { label: "Project progress", section: "progress", icon: <Layers3 /> },
     {
       label: "Expert feedback",
       section: "revisions",
@@ -371,8 +385,9 @@ function InnovatorSection({ section, id }: { section: string; id?: string }) {
   if (section === "innovations" && id === "new") return <InnovationEditor />;
   if (section === "innovations" && id) return <InnovationEditor id={id} />;
   if (section === "innovations") return <InnovationList />;
-  if (section === "progress") return <ProgressPage />;
-  if (section === "revisions") return <RevisionPage />;
+  if (section === "progress")
+    return <Navigate to="/innovator/innovations" replace />;
+  if (section === "revisions") return <RevisionPage selectedId={id} />;
   if (section === "collaborations") return <InnovatorCollaborationsPage />;
   if (section === "notifications") return <NotificationsPage />;
   if (section === "profile") return <ProfilePage />;
@@ -545,7 +560,7 @@ function ExpertDashboard() {
       <PageHeader
         eyebrow="Expert workspace"
         title="Review local innovations with transparent criteria"
-        description="Accept assigned submissions, assess every active criterion, provide actionable comments, and send a recommendation to the System Administrator."
+        description="Open assigned submissions, assess every active criterion, provide actionable comments, and submit your recommendation."
       />
       <StatGrid>
         <StatCard
@@ -612,23 +627,9 @@ function ExpertDashboard() {
 }
 
 function ExpertAssignmentsPage({ selectedId }: { selectedId?: string }) {
-  const { data, request, refreshWorkspace, notify } = usePlatform();
-  const [error, setError] = useState("");
+  const { data } = usePlatform();
   const assignments = data?.assignments ?? [];
   const selected = assignments.find((item) => item.id === selectedId);
-  const accept = async () => {
-    if (!selected) return;
-    try {
-      await request(`/api/v1/reviews/assignments/${selected.id}/accept`, {
-        method: "POST",
-        body: "{}",
-      });
-      await refreshWorkspace();
-      notify("Assignment accepted. The evaluation form is ready.");
-    } catch (cause) {
-      setError(messageOf(cause));
-    }
-  };
   if (selectedId && !selected) return <LoadingPanel />;
   if (selected)
     return (
@@ -644,14 +645,13 @@ function ExpertAssignmentsPage({ selectedId }: { selectedId?: string }) {
             </ButtonLink>
           }
         />
-        {error && <ErrorBox>{error}</ErrorBox>}
         <Panel>
           <PanelBody>
             <StatusBadge status={selected.status} />
             <DetailGrid>
               {[
                 ["Sector", selected.sector],
-                ["District", selected.district],
+                ["Project coverage", selected.district],
                 [
                   "Due",
                   selected.dueAt ? formatDate(selected.dueAt) : "No due date",
@@ -683,21 +683,60 @@ function ExpertAssignmentsPage({ selectedId }: { selectedId?: string }) {
                 </section>
               ))}
             </NarrativeGrid>
-            {selected.status === "ASSIGNED" && (
-              <Actions>
-                <Button onClick={accept}>
-                  <CheckCircle2 />
-                  Accept assignment
-                </Button>
-              </Actions>
-            )}
+            <SectionBlock>
+              <h3>Supporting links</h3>
+              {selected.supportingLinks?.length ? (
+                <FileList>
+                  {selected.supportingLinks.map((link) => (
+                    <div key={link.url}>
+                      <Link2 />
+                      <span>
+                        <strong>{link.title}</strong>
+                        <small>{link.url}</small>
+                      </span>
+                      <a href={link.url} target="_blank" rel="noreferrer">
+                        Open
+                      </a>
+                    </div>
+                  ))}
+                </FileList>
+              ) : (
+                <p>No supporting links were attached.</p>
+              )}
+            </SectionBlock>
+            <SectionBlock>
+              <h3>Review documents</h3>
+              {selected.evidence?.length ? (
+                <FileList>
+                  {selected.evidence.map((file) => (
+                    <div key={file.id}>
+                      <FileText />
+                      <span>
+                        <strong>{file.name}</strong>
+                        <small>{file.mimeType}</small>
+                      </span>
+                      <a
+                        href={`/api/v1/innovations/${selected.innovationId}/evidence/${file.id}/download`}
+                      >
+                        Download
+                      </a>
+                    </div>
+                  ))}
+                </FileList>
+              ) : (
+                <p>No review-team documents were attached.</p>
+              )}
+            </SectionBlock>
           </PanelBody>
         </Panel>
-        {["ACCEPTED", "IN_PROGRESS"].includes(selected.status) && (
+        {["ASSIGNED", "IN_PROGRESS"].includes(selected.status) && (
           <ExpertReviewEditor assignment={selected} />
         )}
         {["COMPLETED", "REVISION_REQUESTED"].includes(selected.status) &&
           selected.review && <SubmittedReviewPanel assignment={selected} />}
+        {selected.reviewHistory.length > 0 && (
+          <ExpertReviewHistory assignment={selected} />
+        )}
       </>
     );
   return (
@@ -816,7 +855,9 @@ function ExpertReviewEditor({ assignment }: { assignment: Assignment }) {
       await refreshWorkspace();
       notify(
         submit
-          ? "Expert recommendation submitted to the System Administrator."
+          ? recommendation === "APPROVE"
+            ? "Recommendation submitted. The innovation is now public."
+            : "Revision request submitted to the Innovator."
           : "Evaluation draft saved.",
       );
     } catch (cause) {
@@ -896,7 +937,6 @@ function ExpertReviewEditor({ assignment }: { assignment: Assignment }) {
               <option value="">Select recommendation</option>
               <option value="APPROVE">Recommend approval</option>
               <option value="REVISION_REQUIRED">Request revisions</option>
-              <option value="REJECT">Recommend rejection</option>
             </Select>
           </Field>
           <Field label="Overall rationale">
@@ -957,9 +997,9 @@ function ExpertReviewEditor({ assignment }: { assignment: Assignment }) {
         <AttachmentNotice>
           <CircleAlert />
           <span>
-            <strong>The System Administrator makes the final decision.</strong>
-            Your score and recommendation support that decision but do not
-            publish or reject the innovation automatically.
+            <strong>Your recommendation completes this review round.</strong>
+            Recommend approval publishes this version automatically. Request
+            revisions returns it to the Innovator and then back to you.
           </span>
         </AttachmentNotice>
         <Actions>
@@ -1014,6 +1054,70 @@ function SubmittedReviewPanel({ assignment }: { assignment: Assignment }) {
           <h3>Rationale</h3>
           <p>{review.rationale}</p>
         </SectionBlock>
+        {review.scores.length > 0 && (
+          <CriteriaList>
+            {review.scores.map((score) => (
+              <section key={score.criterionKey}>
+                <div>
+                  <strong>{score.criterionName || score.criterionKey}</strong>
+                  <small>
+                    {score.score} / 5
+                    {score.weight ? ` · ${score.weight}% weight` : ""}
+                  </small>
+                </div>
+                <p>{score.comment || "No criterion comment."}</p>
+              </section>
+            ))}
+          </CriteriaList>
+        )}
+        {review.revisionRequests.length > 0 && (
+          <SectionBlock>
+            <h3>Revision instructions</h3>
+            <RecordList>
+              {review.revisionRequests.map((revision, index) => (
+                <div key={revision.id || `${revision.fieldKey}-${index}`}>
+                  <span>
+                    <strong>{revision.fieldKey.replaceAll("_", " ")}</strong>
+                    <small>{revision.instruction}</small>
+                  </span>
+                  <StatusBadge status={revision.status} />
+                </div>
+              ))}
+            </RecordList>
+          </SectionBlock>
+        )}
+      </PanelBody>
+    </Panel>
+  );
+}
+
+function ExpertReviewHistory({ assignment }: { assignment: Assignment }) {
+  return (
+    <Panel>
+      <PanelHeader>
+        <div>
+          <h2>Review round history</h2>
+          <p>Submitted scores and recommendations remain read-only.</p>
+        </div>
+      </PanelHeader>
+      <PanelBody>
+        <CardGrid>
+          {assignment.reviewHistory.map((review) => (
+            <SectionBlock key={review.id}>
+              <StatusBadge status={review.recommendation} />
+              <h3>Version {review.version}</h3>
+              <p>{review.rationale}</p>
+              <Meta>
+                <span>{review.totalScore?.toFixed(1) ?? "—"}%</span>
+                <span>
+                  {review.submittedAt
+                    ? formatDate(review.submittedAt)
+                    : "Not submitted"}
+                </span>
+              </Meta>
+            </SectionBlock>
+          ))}
+        </CardGrid>
       </PanelBody>
     </Panel>
   );
@@ -1021,8 +1125,8 @@ function SubmittedReviewPanel({ assignment }: { assignment: Assignment }) {
 
 function ExpertHistoryPage() {
   const { data } = usePlatform();
-  const completed = (data?.assignments ?? []).filter((item) =>
-    ["COMPLETED", "REVISION_REQUESTED"].includes(item.status),
+  const completed = (data?.assignments ?? []).filter(
+    (item) => item.reviewHistory.length > 0,
   );
   return (
     <>
@@ -1039,8 +1143,8 @@ function ExpertHistoryPage() {
                 <span>
                   <strong>{item.innovation}</strong>
                   <small>
-                    {item.review?.recommendation?.replaceAll("_", " ")} ·{" "}
-                    {item.review?.totalScore?.toFixed(1) ?? "0"}%
+                    {item.reviewHistory.length} submitted review
+                    {item.reviewHistory.length === 1 ? "" : "s"}
                   </small>
                 </span>
                 <StatusBadge status={item.status} />
@@ -1147,6 +1251,9 @@ function PartnerDiscoverPage({ selectedId }: { selectedId?: string }) {
   const { data } = usePlatform();
   const [query, setQuery] = useState("");
   const [requestItem, setRequestItem] = useState<Innovation | null>(null);
+  const requestedInnovationIds = new Set(
+    (data?.engagements ?? []).map((engagement) => engagement.innovationId),
+  );
   const items = (data?.innovations ?? []).filter(
     (item) =>
       !query ||
@@ -1170,10 +1277,16 @@ function PartnerDiscoverPage({ selectedId }: { selectedId?: string }) {
                 <ArrowLeft />
                 All innovations
               </ButtonLink>
-              <Button onClick={() => setRequestItem(selected)}>
-                <Handshake />
-                Start request
-              </Button>
+              {requestedInnovationIds.has(selected.id) ? (
+                <ButtonLink to="/partner/opportunities">
+                  View existing request
+                </ButtonLink>
+              ) : (
+                <Button onClick={() => setRequestItem(selected)}>
+                  <Handshake />
+                  Start request
+                </Button>
+              )}
             </Actions>
           }
         />
@@ -1185,7 +1298,7 @@ function PartnerDiscoverPage({ selectedId }: { selectedId?: string }) {
                 ["Innovator", selected.owner],
                 ["Organization", selected.organization],
                 ["Sector", selected.sector],
-                ["District", selected.district],
+                ["Project coverage", selected.district],
                 ["Maturity", selected.maturity],
               ].map(([label, value]) => (
                 <DetailItem key={label}>
@@ -1207,6 +1320,50 @@ function PartnerDiscoverPage({ selectedId }: { selectedId?: string }) {
                 </section>
               ))}
             </NarrativeGrid>
+            <SectionBlock>
+              <h3>Supporting links</h3>
+              {selected.supportingLinks.length ? (
+                <FileList>
+                  {selected.supportingLinks.map((link) => (
+                    <div key={link.url}>
+                      <Link2 />
+                      <span>
+                        <strong>{link.title}</strong>
+                        <small>{link.url}</small>
+                      </span>
+                      <a href={link.url} target="_blank" rel="noreferrer">
+                        Open
+                      </a>
+                    </div>
+                  ))}
+                </FileList>
+              ) : (
+                <p>No supporting links were published.</p>
+              )}
+            </SectionBlock>
+            <SectionBlock>
+              <h3>Public documents</h3>
+              {selected.evidence.length ? (
+                <FileList>
+                  {selected.evidence.map((file) => (
+                    <div key={file.id}>
+                      <FileText />
+                      <span>
+                        <strong>{file.name}</strong>
+                        <small>{file.mimeType}</small>
+                      </span>
+                      <a
+                        href={`/api/v1/public/innovations/${selected.slug}/evidence/${file.id}/download`}
+                      >
+                        Download
+                      </a>
+                    </div>
+                  ))}
+                </FileList>
+              ) : (
+                <p>No public documents were attached.</p>
+              )}
+            </SectionBlock>
           </PanelBody>
         </Panel>
         {requestItem && (
@@ -1230,7 +1387,7 @@ function PartnerDiscoverPage({ selectedId }: { selectedId?: string }) {
           aria-label="Search published innovations"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search title, sector, district, or need"
+          placeholder="Search title, sector, coverage, or need"
         />
       </PartnerSearch>
       {items.length ? (
@@ -1252,9 +1409,15 @@ function PartnerDiscoverPage({ selectedId }: { selectedId?: string }) {
                   >
                     View details
                   </ButtonLink>
-                  <Button onClick={() => setRequestItem(item)}>
-                    Start request
-                  </Button>
+                  {requestedInnovationIds.has(item.id) ? (
+                    <ButtonLink to="/partner/opportunities">
+                      View request
+                    </ButtonLink>
+                  ) : (
+                    <Button onClick={() => setRequestItem(item)}>
+                      Start request
+                    </Button>
+                  )}
                 </Actions>
               </PanelBody>
             </Panel>
@@ -1465,8 +1628,6 @@ function InnovatorCollaborationsPage() {
         method: "POST",
         body: JSON.stringify({
           status,
-          shareEmail: status === "ACCEPTED",
-          sharePhone: false,
         }),
       });
       await refreshWorkspace();
@@ -1481,7 +1642,7 @@ function InnovatorCollaborationsPage() {
       <PageHeader
         eyebrow="Partner engagement"
         title="Collaboration requests"
-        description="Review non-binding contact, funding, and partnership requests. Your email is shared only when you accept."
+        description="Review non-binding contact, funding, and partnership requests. Your email and phone are shared only when you accept."
       />
       {error && <ErrorBox>{error}</ErrorBox>}
       {items.length ? (
@@ -1508,14 +1669,9 @@ function InnovatorCollaborationsPage() {
                   <Actions>
                     <Button onClick={() => respond(item, "ACCEPTED")}>
                       <CheckCircle2 />
-                      Accept and share email
-                    </Button>
-                    <Button
-                      $variant="secondary"
-                      onClick={() => respond(item, "CLARIFICATION_REQUESTED")}
-                    >
-                      Request clarification
-                    </Button>
+                      Accept
+                      </Button>
+
                     <Button
                       $variant="danger"
                       onClick={() => respond(item, "DECLINED")}
@@ -1647,7 +1803,7 @@ const requiredInnovationLabels: Partial<Record<keyof InnovationForm, string>> =
     beneficiaries: "Main beneficiaries",
     sector: "Innovation sector",
     category: "Innovation type",
-    district: "Project district",
+    district: "Project coverage",
     maturity: "Maturity level",
     impactArea: "Primary impact area",
     impact: "Expected impact",
@@ -1673,11 +1829,10 @@ const narrativeInnovationLabels: Partial<Record<keyof InnovationForm, string>> =
     sustainability: "Sustainability",
     supportNeeded: "Support requested",
   };
-const innovationWordLimit = 50;
-const countWords = (value: string) =>
-  value.trim() ? value.trim().split(/\s+/).length : 0;
+const innovationMinimumWords = 30;
+const innovationMaximumWords = 1000;
 const wordLimitHint = (value: string) =>
-  `${countWords(value)}/${innovationWordLimit} words maximum`;
+  `${countWords(value)} words (minimum ${innovationMinimumWords}, maximum ${innovationMaximumWords.toLocaleString()})`;
 const localDraftKey = (userId?: string) =>
   userId ? `lidkep:innovation-draft:${userId}` : "";
 const hasInnovationContent = (form: InnovationForm) =>
@@ -1743,8 +1898,12 @@ function validateInnovation(
   }
   Object.entries(narrativeInnovationLabels).forEach(([field, label]) => {
     const value = form[field as keyof InnovationForm];
-    if (typeof value === "string" && countWords(value) > innovationWordLimit)
-      errors[field] = `${label} must contain 50 words or fewer.`;
+    if (typeof value !== "string" || !value.trim()) return;
+    const words = countWords(value);
+    if (words < innovationMinimumWords)
+      errors[field] = `${label} must contain at least ${innovationMinimumWords} words.`;
+    else if (words > innovationMaximumWords)
+      errors[field] = `${label} must contain ${innovationMaximumWords.toLocaleString()} words or fewer.`;
   });
   return errors;
 }
@@ -2029,15 +2188,15 @@ function InnovationEditor({ id }: { id?: string }) {
                 ))}
               </Select>
             </Field>
-            <Field label="Project district" error={fieldErrors.district}>
+            <Field label="Project coverage" error={fieldErrors.district}>
               <Select
                 id="innovation-district"
                 value={form.district}
                 disabled={!editable}
                 onChange={(e) => set("district", e.target.value)}
               >
-                <option value="">Select project district</option>
-                {data?.taxonomies.districts.map((value) => (
+                <option value="">Select project coverage</option>
+                {projectCoverageLevels.map((value) => (
                   <option key={value}>{value}</option>
                 ))}
               </Select>
@@ -2463,161 +2622,29 @@ function InnovationEditor({ id }: { id?: string }) {
   );
 }
 
-function ProgressPage() {
-  const { data, request, refreshWorkspace, notify } = usePlatform();
-  const records = data?.innovations ?? [];
-  const [innovationId, setInnovationId] = useState(records[0]?.id ?? "");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState("IN_PROGRESS");
-  const [targetDate, setTargetDate] = useState("");
-  const [error, setError] = useState("");
-  useEffect(() => {
-    if (!innovationId && records[0]) setInnovationId(records[0].id);
-  }, [records.length]);
-  const add = async () => {
-    setError("");
-    try {
-      await request(`/api/v1/innovations/${innovationId}/milestones`, {
-        method: "POST",
-        body: JSON.stringify({
-          title,
-          description,
-          status,
-          targetDate: targetDate || undefined,
-          visibility: "REVIEW_TEAM",
-        }),
-      });
-      await refreshWorkspace();
-      setTitle("");
-      setDescription("");
-      notify("Project progress saved.");
-    } catch (cause) {
-      setError(messageOf(cause));
-    }
-  };
-  return (
-    <>
-      <PageHeader
-        eyebrow="Project progress"
-        title="Milestones and updates"
-        description="Record simple progress updates for each innovation."
-      />
-      {error && <ErrorBox>{error}</ErrorBox>}
-      {records.length ? (
-        <>
-          <Panel>
-            <PanelHeader>
-              <h2>Add progress update</h2>
-            </PanelHeader>
-            <PanelBody>
-              <FormGrid>
-                <Field label="Innovation">
-                  <Select
-                    value={innovationId}
-                    onChange={(e) => setInnovationId(e.target.value)}
-                  >
-                    {records.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.title}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Status">
-                  <Select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                  >
-                    <option value="PLANNED">Planned</option>
-                    <option value="IN_PROGRESS">In progress</option>
-                    <option value="COMPLETED">Completed</option>
-                    <option value="CANCELLED">Cancelled</option>
-                  </Select>
-                </Field>
-                <Field label="Update title">
-                  <Input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                  />
-                </Field>
-                <Field label="Target date">
-                  <Input
-                    type="date"
-                    value={targetDate}
-                    onChange={(e) => setTargetDate(e.target.value)}
-                  />
-                </Field>
-              </FormGrid>
-              <Field label="Description">
-                <Textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </Field>
-              <Actions>
-                <Button disabled={!title.trim()} onClick={add}>
-                  <Plus />
-                  Add update
-                </Button>
-              </Actions>
-            </PanelBody>
-          </Panel>
-          <CardGrid>
-            {records
-              .flatMap((record) =>
-                record.milestones.map((item) => ({
-                  ...item,
-                  innovation: record.title,
-                })),
-              )
-              .map((item, index) => (
-                <Panel key={item.id ?? index}>
-                  <PanelBody>
-                    <StatusBadge status={item.status} />
-                    <h2>{item.title}</h2>
-                    <p>{item.description || "No description provided."}</p>
-                    <small>
-                      {item.innovation}
-                      {item.date ? ` · ${formatDate(item.date)}` : ""}
-                    </small>
-                  </PanelBody>
-                </Panel>
-              ))}
-          </CardGrid>
-        </>
-      ) : (
-        <EmptyState
-          title="Create an innovation first"
-          copy="Progress updates are connected to an innovation record."
-          action={
-            <ButtonLink to="/innovator/innovations/new">
-              Create innovation
-            </ButtonLink>
-          }
-        />
-      )}
-    </>
-  );
-}
-
-function RevisionPage() {
-  const { data, request, refreshWorkspace, notify } = usePlatform();
-  const revisions = data?.revisions ?? [];
+function RevisionPage({ selectedId }: { selectedId?: string }) {
+  const { request, notify } = usePlatform();
+  const [feedback, setFeedback] = useState<InnovationFeedback[]>([]);
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
-  const respond = async (item: (typeof revisions)[number]) => {
-    if (!item.innovationId) return;
+  const load = () =>
+    request<InnovationFeedback[]>("/api/v1/innovations/feedback")
+      .then(setFeedback)
+      .catch((cause) => setError(messageOf(cause)));
+  useEffect(() => {
+    void load();
+  }, []);
+  const respond = async (innovationId: string, revisionId: string) => {
     setError("");
     try {
       await request(
-        `/api/v1/innovations/${item.innovationId}/revisions/${item.id}/respond`,
+        `/api/v1/innovations/${innovationId}/revisions/${revisionId}/respond`,
         {
           method: "POST",
-          body: JSON.stringify({ response: responses[item.id] || "" }),
+          body: JSON.stringify({ response: responses[revisionId] || "" }),
         },
       );
-      await refreshWorkspace();
+      await load();
       notify("Response sent to the review team.");
     } catch (cause) {
       setError(messageOf(cause));
@@ -2627,48 +2654,122 @@ function RevisionPage() {
     <>
       <PageHeader
         eyebrow="Expert feedback"
-        title="Revision requests"
-        description="Respond to comments connected to a submitted innovation version."
+        title="Expert feedback"
+        description="Review every score, recommendation, rationale, and revision instruction across submitted versions."
       />
       {error && <ErrorBox>{error}</ErrorBox>}
-      {revisions.length ? (
+      {(selectedId
+        ? feedback.filter((item) => item.innovationId === selectedId)
+        : feedback
+      ).length ? (
         <CardGrid>
-          {revisions.map((item) => (
-            <Panel key={item.id}>
+          {(selectedId
+            ? feedback.filter((item) => item.innovationId === selectedId)
+            : feedback
+          ).map((item) => (
+            <Panel key={item.innovationId}>
               <PanelBody>
                 <StatusBadge status={item.status} />
                 <h2>{item.innovation}</h2>
-                <Eyebrow>{item.field}</Eyebrow>
-                <p>{item.instruction}</p>
-                {item.status === "OPEN" && (
-                  <>
-                    <Field label="Your response">
-                      <Textarea
-                        value={responses[item.id] ?? ""}
-                        onChange={(e) =>
-                          setResponses((old) => ({
-                            ...old,
-                            [item.id]: e.target.value,
-                          }))
-                        }
-                      />
-                    </Field>
-                    <Button
-                      disabled={!(responses[item.id] ?? "").trim()}
-                      onClick={() => respond(item)}
+                <p>Assigned Expert: {item.expert}</p>
+                {item.status === "REVISION_REQUIRED" && (
+                  <Actions>
+                    <ButtonLink
+                      to={`/innovator/innovations/${item.innovationId}`}
                     >
-                      Send response
-                    </Button>
-                  </>
+                      <Pencil />
+                      Revise innovation
+                    </ButtonLink>
+                  </Actions>
                 )}
+                {item.rounds.map((round) => (
+                  <SectionBlock key={round.id}>
+                    <StatusBadge status={round.recommendation} />
+                    <h3>Version {round.version} review</h3>
+                    <DetailGrid>
+                      <DetailItem>
+                        <small>Weighted score</small>
+                        <strong>
+                          {round.totalScore?.toFixed(1) ?? "Not available"}%
+                        </strong>
+                      </DetailItem>
+                      <DetailItem>
+                        <small>Submitted</small>
+                        <strong>
+                          {round.submittedAt
+                            ? formatDate(round.submittedAt)
+                            : "Not submitted"}
+                        </strong>
+                      </DetailItem>
+                    </DetailGrid>
+                    <h3>Overall rationale</h3>
+                    <p>{round.rationale}</p>
+                    {round.scores.length > 0 && (
+                      <CriteriaList>
+                        {round.scores.map((score) => (
+                          <section key={score.criterionKey}>
+                            <div>
+                              <strong>
+                                {score.criterionName || score.criterionKey}
+                              </strong>
+                              <small>
+                                {score.score} / 5
+                                {score.weight
+                                  ? ` · ${score.weight}% weight`
+                                  : ""}
+                              </small>
+                            </div>
+                            <p>{score.comment || "No criterion comment."}</p>
+                          </section>
+                        ))}
+                      </CriteriaList>
+                    )}
+                    {round.revisionRequests.map((revision) => (
+                      <SectionBlock key={revision.id}>
+                        <Eyebrow>
+                          {revision.fieldKey.replaceAll("_", " ")}
+                        </Eyebrow>
+                        <p>{revision.instruction}</p>
+                        {revision.response && (
+                          <p>
+                            <strong>Your response:</strong> {revision.response}
+                          </p>
+                        )}
+                        {revision.status === "OPEN" && revision.id && (
+                          <>
+                            <Field label="Your response">
+                              <Textarea
+                                value={responses[revision.id] ?? ""}
+                                onChange={(event) =>
+                                  setResponses((old) => ({
+                                    ...old,
+                                    [revision.id!]: event.target.value,
+                                  }))
+                                }
+                              />
+                            </Field>
+                            <Button
+                              disabled={!(responses[revision.id] ?? "").trim()}
+                              onClick={() =>
+                                respond(item.innovationId, revision.id!)
+                              }
+                            >
+                              Send response
+                            </Button>
+                          </>
+                        )}
+                      </SectionBlock>
+                    ))}
+                  </SectionBlock>
+                ))}
               </PanelBody>
             </Panel>
           ))}
         </CardGrid>
       ) : (
         <EmptyState
-          title="No revision requests"
-          copy="Expert comments will appear here after the review phase begins."
+          title="No Expert feedback"
+          copy="Submitted Expert scores and recommendations will appear here."
         />
       )}
     </>
@@ -3342,6 +3443,11 @@ function VerificationsPage({ selectedId }: { selectedId?: string }) {
                         <strong>{file.name}</strong>
                         <small>{file.mimeType}</small>
                       </span>
+                      <a
+                        href={`/api/v1/users/profile/evidence/${file.id}/download`}
+                      >
+                        Download
+                      </a>
                     </div>
                   ))}
                 </FileList>
@@ -3438,21 +3544,16 @@ function VerificationsPage({ selectedId }: { selectedId?: string }) {
   );
 }
 
-const expertAssignableStatuses = new Set([
-  "SUBMITTED",
-  "UNDER_REVIEW",
-  "APPROVED",
-  "PUBLISHED",
-]);
-
 const canAssignExpert = (innovation: Innovation) =>
   !innovation.assignment &&
   Boolean(innovation.submittedAt) &&
-  expertAssignableStatuses.has(innovation.status);
+  Boolean(innovation.administratorReviewedAt) &&
+  innovation.status === "SUBMITTED";
 
 function AdminInnovationsPage({ selectedId }: { selectedId?: string }) {
   const { data, request, notify } = usePlatform();
   const [items, setItems] = useState<Innovation[]>([]);
+  const [selectedDetail, setSelectedDetail] = useState<Innovation | null>(null);
   const [editing, setEditing] = useState<Innovation | "new" | null>(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -3474,10 +3575,21 @@ function AdminInnovationsPage({ selectedId }: { selectedId?: string }) {
   useEffect(() => {
     void load();
   }, []);
+  useEffect(() => {
+    if (!selectedId) {
+      setSelectedDetail(null);
+      return;
+    }
+    request<Innovation>(`/api/v1/admin/innovations/${selectedId}`)
+      .then((record) => {
+        setSelectedDetail(record);
+        setError("");
+      })
+      .catch((cause) => setError(messageOf(cause)));
+  }, [selectedId]);
   const [pending, setPending] = useState<{
     item: Innovation;
-    action: "status" | "delete";
-    status?: string;
+    action: "archive" | "delete";
   } | null>(null);
   const decide = async () => {
     if (!pending) return;
@@ -3488,14 +3600,19 @@ function AdminInnovationsPage({ selectedId }: { selectedId?: string }) {
         });
         notify("Innovation deleted.");
       } else {
-        await request(`/api/v1/admin/innovations/${pending.item.id}/decision`, {
+        await request(`/api/v1/admin/innovations/${pending.item.id}/archive`, {
           method: "POST",
-          body: JSON.stringify({ status: pending.status }),
+          body: "{}",
         });
-        notify("Innovation status updated and the Innovator was notified.");
+        notify("Innovation archived and the Innovator was notified.");
       }
       setPending(null);
       await load();
+      if (selectedId) {
+        setSelectedDetail(
+          await request<Innovation>(`/api/v1/admin/innovations/${selectedId}`),
+        );
+      }
     } catch (cause) {
       setError(messageOf(cause));
     }
@@ -3524,7 +3641,8 @@ function AdminInnovationsPage({ selectedId }: { selectedId?: string }) {
       throw cause;
     }
   };
-  const selected = items.find((item) => item.id === selectedId);
+  const selected =
+    selectedDetail ?? items.find((item) => item.id === selectedId);
   const approvedExperts = (data?.users ?? []).filter(
     (user) => user.role === "EXPERT" && user.accountStatus === "ACTIVE",
   );
@@ -3605,6 +3723,11 @@ function AdminInnovationsPage({ selectedId }: { selectedId?: string }) {
       );
       closeAssignment();
       await load();
+      if (selectedId) {
+        setSelectedDetail(
+          await request<Innovation>(`/api/v1/admin/innovations/${selectedId}`),
+        );
+      }
     } catch (cause) {
       setAssignmentError(messageOf(cause));
     } finally {
@@ -3617,7 +3740,7 @@ function AdminInnovationsPage({ selectedId }: { selectedId?: string }) {
         icon={<FolderKanban />}
         eyebrow="Innovation management"
         title={selected ? selected.title : "All innovations"}
-        description="Review submitted records, control status, and publish only approved versions."
+        description="Review complete submissions, assign one Expert, and monitor revision or automatic publication outcomes."
         action={
           selected ? (
             <Actions>
@@ -3654,11 +3777,17 @@ function AdminInnovationsPage({ selectedId }: { selectedId?: string }) {
                 ["Organization", selected.organization],
                 ["Sector", selected.sector],
                 ["Category", selected.category],
-                ["District", selected.district],
+                ["Project coverage", selected.district],
                 ["Maturity", selected.maturity],
                 ["Impact area", selected.impactArea],
                 ["Completion", `${selected.completion}%`],
                 ["Version", String(selected.version)],
+                [
+                  "Administrator review",
+                  selected.administratorReviewedAt
+                    ? formatDate(selected.administratorReviewedAt)
+                    : "Not reviewed",
+                ],
                 [
                   "Created",
                   selected.createdAt ? formatDate(selected.createdAt) : "",
@@ -3694,6 +3823,27 @@ function AdminInnovationsPage({ selectedId }: { selectedId?: string }) {
                 </section>
               ))}
             </NarrativeGrid>
+            <SectionBlock>
+              <h3>Supporting links</h3>
+              {selected.supportingLinks.length ? (
+                <FileList>
+                  {selected.supportingLinks.map((link) => (
+                    <div key={link.url}>
+                      <Link2 />
+                      <span>
+                        <strong>{link.title}</strong>
+                        <small>{link.url}</small>
+                      </span>
+                      <a href={link.url} target="_blank" rel="noreferrer">
+                        Open
+                      </a>
+                    </div>
+                  ))}
+                </FileList>
+              ) : (
+                <p>No supporting links.</p>
+              )}
+            </SectionBlock>
             <SectionBlock>
               <h3>Evidence files</h3>
               {selected.evidence.length ? (
@@ -3741,7 +3891,43 @@ function AdminInnovationsPage({ selectedId }: { selectedId?: string }) {
                 </Button>
               </SectionBlock>
             ) : null}
+            {selected.assignment?.reviewHistory?.length ? (
+              <SectionBlock>
+                <h3>Expert review history</h3>
+                <CardGrid>
+                  {selected.assignment.reviewHistory.map((review) => (
+                    <Panel key={review.id}>
+                      <PanelBody>
+                        <StatusBadge status={review.recommendation} />
+                        <h3>Version {review.version}</h3>
+                        <p>{review.rationale}</p>
+                        <Meta>
+                          <span>
+                            Score {review.totalScore?.toFixed(1) ?? "—"}%
+                          </span>
+                          <span>
+                            {review.submittedAt
+                              ? formatDate(review.submittedAt)
+                              : "Not submitted"}
+                          </span>
+                        </Meta>
+                      </PanelBody>
+                    </Panel>
+                  ))}
+                </CardGrid>
+              </SectionBlock>
+            ) : null}
             <Actions>
+              {selected.status !== "ARCHIVED" && (
+                <Button
+                  $variant="secondary"
+                  onClick={() =>
+                    setPending({ item: selected, action: "archive" })
+                  }
+                >
+                  Archive innovation
+                </Button>
+              )}
               <Button
                 $variant="danger"
                 onClick={() => setPending({ item: selected, action: "delete" })}
@@ -3811,7 +3997,6 @@ function AdminInnovationsPage({ selectedId }: { selectedId?: string }) {
                   <th>Assigned to</th>
                   <th>Completion</th>
                   <th>Status</th>
-                  <th>Decision</th>
                   <th>Submitted</th>
                   <th>Actions</th>
                 </tr>
@@ -3863,31 +4048,6 @@ function AdminInnovationsPage({ selectedId }: { selectedId?: string }) {
                       <StatusBadge status={item.status} />
                     </td>
                     <td>
-                      <Select
-                        aria-label={`Change status for ${item.title}`}
-                        value={item.status}
-                        onChange={(e) =>
-                          setPending({
-                            item,
-                            action: "status",
-                            status: e.target.value,
-                          })
-                        }
-                      >
-                        <option value={item.status}>
-                          {item.status.replaceAll("_", " ")}
-                        </option>
-                        <option value="UNDER_REVIEW">Under review</option>
-                        <option value="REVISION_REQUIRED">
-                          Revision required
-                        </option>
-                        <option value="APPROVED">Approved</option>
-                        <option value="REJECTED">Rejected</option>
-                        <option value="PUBLISHED">Published</option>
-                        <option value="ARCHIVED">Archived</option>
-                      </Select>
-                    </td>
-                    <td>
                       {item.submittedAt ? formatDate(item.submittedAt) : "—"}
                     </td>
                     <td>
@@ -3899,29 +4059,13 @@ function AdminInnovationsPage({ selectedId }: { selectedId?: string }) {
                         >
                           <Eye />
                         </IconButtonLink>
-                        {item.assignment ? (
+                        {item.assignment && (
                           <LockedAssignment
                             title={`Assigned to ${item.assignment.expert}`}
                           >
                             <LockKeyhole />
                             Assigned
                           </LockedAssignment>
-                        ) : (
-                          <RowActionButton
-                            type="button"
-                            disabled={!canAssignExpert(item)}
-                            onClick={() => openAssignment(item)}
-                            title={
-                              canAssignExpert(item)
-                                ? "Assign an Expert"
-                                : item.status === "ARCHIVED"
-                                  ? "Archived innovations cannot be assigned"
-                                  : "Submit and freeze the innovation before assignment"
-                            }
-                          >
-                            <UserCheck />
-                            Assign Expert
-                          </RowActionButton>
                         )}
                       </RowActions>
                     </td>
@@ -3959,19 +4103,15 @@ function AdminInnovationsPage({ selectedId }: { selectedId?: string }) {
           title={
             pending.action === "delete"
               ? `Delete ${pending.item.title}?`
-              : `Change ${pending.item.title} to ${pending.status?.replaceAll("_", " ").toLowerCase()}?`
+              : `Archive ${pending.item.title}?`
           }
           message={
             pending.action === "delete"
               ? "This permanently removes an innovation that has no review or engagement history."
-              : "The innovation status will change immediately and its owner will be notified."
+              : "The innovation will leave active workflows and its owner will be notified."
           }
           confirmLabel="Yes"
-          danger={
-            pending.action === "delete" ||
-            pending.status === "REJECTED" ||
-            pending.status === "ARCHIVED"
-          }
+          danger
           onCancel={() => setPending(null)}
           onConfirm={decide}
         />
@@ -4080,7 +4220,7 @@ function InnovationAdminEditor({
     ["beneficiaries", "Beneficiaries"],
     ["sector", "Sector"],
     ["category", "Category"],
-    ["district", "District"],
+    ["district", "Project coverage"],
     ["maturity", "Maturity"],
     ["impactArea", "Impact area"],
     ["impact", "Expected impact"],
@@ -4151,7 +4291,19 @@ function InnovationAdminEditor({
                 ].includes(String(key));
                 return (
                   <Field key={String(key)} label={label}>
-                    {narrative ? (
+                    {key === "district" ? (
+                      <Select
+                        name="district"
+                        defaultValue={item?.district ?? ""}
+                      >
+                        <option value="">Select project coverage</option>
+                        {projectCoverageLevels.map((value) => (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : narrative ? (
                       <Textarea
                         name={String(key)}
                         defaultValue={item?.[key] as string}
@@ -4290,12 +4442,42 @@ function TaxonomiesPage() {
   );
 }
 
+const standardCriterionNames = [
+  "Problem relevance",
+  "Solution quality",
+  "Feasibility",
+  "Potential impact",
+  "Maturity and evidence",
+];
+
+function balancedCriteria(
+  count: number,
+  current: CriteriaDraftItem[] = [],
+): CriteriaDraftItem[] {
+  const baseWeight = Math.floor(10000 / count) / 100;
+  const remainder = Number((100 - baseWeight * count).toFixed(2));
+  return Array.from({ length: count }, (_, index) => ({
+    name:
+      current[index]?.name ??
+      standardCriterionNames[index] ??
+      `Criterion ${index + 1}`,
+    guidance: current[index]?.guidance ?? "",
+    weight: Number((baseWeight + (index === 0 ? remainder : 0)).toFixed(2)),
+  }));
+}
+
 function CriteriaPage() {
   const { request, notify } = usePlatform();
   const [items, setItems] = useState<CriteriaVersion[]>([]);
   const [show, setShow] = useState(false);
   const [version, setVersion] = useState("v1.1");
-  const [name, setName] = useState("Prototype innovation evaluation");
+  const [name, setName] = useState("Innovation evaluation");
+  const [criteria, setCriteria] = useState<CriteriaDraftItem[]>(() =>
+    balancedCriteria(5),
+  );
+  const [busy, setBusy] = useState(false);
+  const [pendingActivation, setPendingActivation] =
+    useState<CriteriaVersion | null>(null);
   const [error, setError] = useState("");
   const load = () =>
     request<CriteriaVersion[]>("/api/v1/admin/criteria")
@@ -4304,24 +4486,80 @@ function CriteriaPage() {
   useEffect(() => {
     void load();
   }, []);
+  const totalWeight = Number(
+    criteria
+      .reduce((total, item) => total + Number(item.weight || 0), 0)
+      .toFixed(2),
+  );
+  const names = criteria.map((item) => item.name.trim().toLowerCase());
+  const namesAreUnique = new Set(names).size === names.length;
+  const canCreate =
+    version.trim().length >= 2 &&
+    name.trim().length >= 3 &&
+    criteria.every(
+      (item) =>
+        item.name.trim().length >= 2 && item.weight > 0 && item.weight <= 100,
+    ) &&
+    namesAreUnique &&
+    Math.abs(totalWeight - 100) < 0.001;
+  const resizeCriteria = (count: number) => {
+    setCriteria((current) => balancedCriteria(count, current));
+  };
+  const updateCriterion = (
+    index: number,
+    field: keyof CriteriaDraftItem,
+    value: string | number,
+  ) => {
+    setCriteria((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item,
+      ),
+    );
+  };
   const create = async () => {
-    const criteria = [
-      "Problem relevance",
-      "Solution quality",
-      "Feasibility",
-      "Potential impact",
-      "Maturity and evidence",
-    ].map((item) => ({ name: item, weight: 20 }));
+    setBusy(true);
+    setError("");
     try {
       await request("/api/v1/admin/criteria", {
         method: "POST",
-        body: JSON.stringify({ version, name, criteria }),
+        body: JSON.stringify({
+          version: version.trim(),
+          name: name.trim(),
+          criteria: criteria.map((item) => ({
+            name: item.name.trim(),
+            guidance: item.guidance.trim() || undefined,
+            weight: Number(item.weight),
+          })),
+        }),
       });
       notify("Draft evaluation criteria created.");
       setShow(false);
-      load();
+      setCriteria(balancedCriteria(5));
+      await load();
     } catch (cause) {
       setError(messageOf(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const activate = async () => {
+    if (!pendingActivation) return;
+    setBusy(true);
+    setError("");
+    try {
+      await request(`/api/v1/admin/criteria/${pendingActivation.id}/activate`, {
+        method: "POST",
+        body: "{}",
+      });
+      notify(
+        `${pendingActivation.version} is now used for new Expert assignments.`,
+      );
+      setPendingActivation(null);
+      await load();
+    } catch (cause) {
+      setError(messageOf(cause));
+    } finally {
+      setBusy(false);
     }
   };
   return (
@@ -4329,31 +4567,120 @@ function CriteriaPage() {
       <PageHeader
         eyebrow="Evaluation"
         title="Evaluation criteria"
-        description="Simple weighted criteria for the next Expert phase. Weights must total 100%."
+        description="Create weighted criteria versions and choose which version new Expert assignments will use."
         action={
           <Button onClick={() => setShow((value) => !value)}>
-            <Plus />
-            New draft
+            {show ? <X /> : <Plus />}
+            {show ? "Close builder" : "New criteria version"}
           </Button>
         }
       />
       {error && <ErrorBox>{error}</ErrorBox>}
       {show && (
         <Panel>
+          <PanelHeader>
+            <div>
+              <h2>Build a criteria version</h2>
+              <p>
+                Set the number of criteria, names, guidance, and weights before
+                saving.
+              </p>
+            </div>
+          </PanelHeader>
           <PanelBody>
             <FormGrid>
               <Field label="Version">
                 <Input
                   value={version}
                   onChange={(e) => setVersion(e.target.value)}
+                  placeholder="For example, v1.1"
                 />
               </Field>
               <Field label="Name">
                 <Input value={name} onChange={(e) => setName(e.target.value)} />
               </Field>
+              <Field label="Number of criteria">
+                <Select
+                  value={criteria.length}
+                  onChange={(event) =>
+                    resizeCriteria(Number(event.target.value))
+                  }
+                >
+                  {Array.from({ length: 11 }, (_, index) => index + 2).map(
+                    (count) => (
+                      <option key={count} value={count}>
+                        {count} criteria
+                      </option>
+                    ),
+                  )}
+                </Select>
+              </Field>
             </FormGrid>
-            <p>Creates five standard criteria at 20% each.</p>
-            <Button onClick={create}>Create criteria draft</Button>
+            <CriteriaBuilder>
+              {criteria.map((criterion, index) => (
+                <CriterionEditor key={index}>
+                  <CriterionNumber aria-hidden="true">
+                    {index + 1}
+                  </CriterionNumber>
+                  <CriterionFields>
+                    <Field label={`Criterion ${index + 1} name`}>
+                      <Input
+                        value={criterion.name}
+                        onChange={(event) =>
+                          updateCriterion(index, "name", event.target.value)
+                        }
+                      />
+                    </Field>
+                    <Field label={`Criterion ${index + 1} guidance (optional)`}>
+                      <Input
+                        value={criterion.guidance}
+                        onChange={(event) =>
+                          updateCriterion(index, "guidance", event.target.value)
+                        }
+                        placeholder="Explain what the Expert should assess"
+                      />
+                    </Field>
+                    <Field label="Weight (%)">
+                      <Input
+                        type="number"
+                        min="0.01"
+                        max="100"
+                        step="0.01"
+                        value={criterion.weight}
+                        onChange={(event) =>
+                          updateCriterion(
+                            index,
+                            "weight",
+                            Number(event.target.value),
+                          )
+                        }
+                      />
+                    </Field>
+                  </CriterionFields>
+                </CriterionEditor>
+              ))}
+            </CriteriaBuilder>
+            <CriteriaBuilderFooter>
+              <WeightSummary $valid={Math.abs(totalWeight - 100) < 0.001}>
+                <strong>Total weight: {totalWeight.toFixed(2)}%</strong>
+                <span>
+                  {Math.abs(totalWeight - 100) < 0.001
+                    ? "Ready to save"
+                    : "Weights must total exactly 100%."}
+                </span>
+              </WeightSummary>
+              <Actions>
+                <Button $variant="secondary" onClick={() => setShow(false)}>
+                  Cancel
+                </Button>
+                <Button disabled={!canCreate || busy} onClick={create}>
+                  {busy ? "Creating..." : "Create draft"}
+                </Button>
+              </Actions>
+            </CriteriaBuilderFooter>
+            {!namesAreUnique && (
+              <ErrorBox>Every criterion must have a distinct name.</ErrorBox>
+            )}
           </PanelBody>
         </Panel>
       )}
@@ -4361,21 +4688,62 @@ function CriteriaPage() {
         {items.map((item) => (
           <Panel key={item.id}>
             <PanelBody>
-              <StatusBadge status={item.status} />
-              <h2>{item.name}</h2>
-              <p>{item.version}</p>
+              <CriteriaCardHeader>
+                <div>
+                  <StatusBadge status={item.status} />
+                  <h2>{item.name}</h2>
+                  <p>
+                    {item.version} · {item.criteria.length} criteria
+                  </p>
+                </div>
+                {item.status === "ACTIVE" ? (
+                  <ActiveCriteriaMark>
+                    <CheckCircle2 />
+                    Used for new assignments
+                  </ActiveCriteriaMark>
+                ) : (
+                  <Button
+                    $variant="secondary"
+                    disabled={busy}
+                    onClick={() => setPendingActivation(item)}
+                  >
+                    Use this version
+                  </Button>
+                )}
+              </CriteriaCardHeader>
               <CriteriaList>
                 {item.criteria.map((criterion) => (
-                  <div key={criterion.name}>
-                    <span>{criterion.name}</span>
+                  <div key={criterion.id}>
+                    <span>
+                      <strong>{criterion.name}</strong>
+                      {criterion.guidance && (
+                        <small>{criterion.guidance}</small>
+                      )}
+                    </span>
                     <strong>{criterion.weight}%</strong>
                   </div>
                 ))}
               </CriteriaList>
+              <CriteriaVersionMeta>
+                {item.status === "ACTIVE" && item.activatedAt
+                  ? `Activated ${formatDate(item.activatedAt)}`
+                  : item.status === "RETIRED" && item.retiredAt
+                    ? `Retired ${formatDate(item.retiredAt)}`
+                    : `Created ${formatDate(item.createdAt)}`}
+              </CriteriaVersionMeta>
             </PanelBody>
           </Panel>
         ))}
       </CardGrid>
+      {pendingActivation && (
+        <ConfirmationDialog
+          title={`Use ${pendingActivation.version} for new assignments?`}
+          message="The currently active version will be retired. Existing Expert assignments and revision rounds will keep their original criteria version."
+          confirmLabel="Activate"
+          onCancel={() => setPendingActivation(null)}
+          onConfirm={activate}
+        />
+      )}
     </>
   );
 }
@@ -4513,6 +4881,7 @@ function SettingsPage() {
 
 function NotificationsPage() {
   const { data, request, refreshWorkspace, notify } = usePlatform();
+  const navigate = useNavigate();
   const items = data?.notifications ?? [];
   const read = async () => {
     await request("/api/v1/users/me/notifications/read", {
@@ -4521,6 +4890,16 @@ function NotificationsPage() {
     });
     await refreshWorkspace();
     notify("Notifications marked as read.");
+  };
+  const openNotification = async (item: (typeof items)[number]) => {
+    if (!item.read) {
+      await request(`/api/v1/users/me/notifications/${item.id}/read`, {
+        method: "POST",
+        body: "{}",
+      });
+      await refreshWorkspace();
+    }
+    if (item.actionPath) navigate(item.actionPath);
   };
   return (
     <>
@@ -4538,7 +4917,11 @@ function NotificationsPage() {
         {items.length ? (
           <RecordList>
             {items.map((item) => (
-              <div key={item.id}>
+              <button
+                type="button"
+                key={item.id}
+                onClick={() => void openNotification(item)}
+              >
                 <Bell />
                 <span>
                   <strong>{item.title}</strong>
@@ -4547,7 +4930,8 @@ function NotificationsPage() {
                   </small>
                 </span>
                 {!item.read && <Unread>New</Unread>}
-              </div>
+                <ChevronRight />
+              </button>
             ))}
           </RecordList>
         ) : (
@@ -4582,15 +4966,26 @@ function ProfilePage() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [identificationDocument, setIdentificationDocument] =
+    useState<File | null>(null);
+  const [identificationDocuments, setIdentificationDocuments] = useState<
+    Array<{
+      id: string;
+      name: string;
+      mimeType: string;
+      sizeBytes: string;
+      createdAt: string;
+    }>
+  >([]);
   useEffect(() => {
     request<Record<string, unknown>>("/api/v1/users/me/profile")
-      .then((profile) =>
+      .then((profile) => {
         setForm((old) => ({
           ...old,
           displayName: String(profile.name ?? old.displayName),
           identificationType: String(profile.identificationType ?? ""),
           identificationNumber: String(profile.identificationNumber ?? ""),
-          phoneNumber: String(profile.phoneNumber ?? ""),
+          phoneNumber: String(profile.phoneNumber ?? "").replace(/^\+250/, "0"),
           educationLevel: String(profile.educationLevel ?? ""),
           province: String(profile.province ?? ""),
           district: String(profile.district ?? ""),
@@ -4600,8 +4995,13 @@ function ProfilePage() {
           organization: String(profile.organization ?? ""),
           preferredLanguage: String(profile.preferredLanguage ?? "en"),
           publicProfile: Boolean(profile.publicProfile),
-        })),
-      )
+        }));
+        setIdentificationDocuments(
+          Array.isArray(profile.identificationDocuments)
+            ? (profile.identificationDocuments as typeof identificationDocuments)
+            : [],
+        );
+      })
       .catch((cause) => setError(messageOf(cause)));
   }, []);
   const locations = data?.taxonomies.locations ?? {};
@@ -4620,15 +5020,27 @@ function ProfilePage() {
   };
   const validate = () => {
     const details: FieldErrors = {};
-    if (form.displayName.trim().length < 2)
-      details.displayName = "Enter your names as shown on your identification.";
+    if (!fullNameIsValid(form.displayName))
+      details.displayName =
+        "Names may contain letters, spaces, apostrophes, and hyphens only.";
     if (!form.identificationType)
       details.identificationType = "Select an identification type.";
-    if (form.identificationNumber.trim().length < 5)
-      details.identificationNumber = "Enter a valid identification number.";
-    if (!/^(?:\+2507\d{8}|07\d{8})$/.test(form.phoneNumber))
+    const identificationError = identificationNumberError(
+      form.identificationType,
+      form.identificationNumber,
+    );
+    if (identificationError)
+      details.identificationNumber = identificationError;
+    if (!/^07\d{8}$/.test(form.phoneNumber))
       details.phoneNumber =
-        "Use a Rwanda mobile number such as +250 7XX XXX XXX.";
+        "Use a valid Rwanda mobile number: 07 followed by 8 digits.";
+    if (
+      form.identificationType === "OTHER_GOVERNMENT_ID" &&
+      !identificationDocument &&
+      identificationDocuments.length === 0
+    )
+      details.identificationDocument =
+        "Upload the selected government-issued identification document.";
     if (!form.educationLevel)
       details.educationLevel = "Select your level of education.";
     if (form.occupation.trim().length < 2)
@@ -4640,6 +5052,22 @@ function ProfilePage() {
     if (!form.administrativeSector)
       details.administrativeSector = "Select a Sector.";
     return details;
+  };
+  const persistProfile = async () => {
+    if (identificationDocument) {
+      const body = new FormData();
+      body.append("file", identificationDocument);
+      const uploaded = await request<(typeof identificationDocuments)[number]>(
+        "/api/v1/users/me/profile/evidence",
+        { method: "POST", body },
+      );
+      setIdentificationDocuments((current) => [uploaded, ...current]);
+      setIdentificationDocument(null);
+    }
+    await request("/api/v1/users/me/profile", {
+      method: "PUT",
+      body: JSON.stringify(form),
+    });
   };
   const save = async () => {
     const details = validate();
@@ -4653,10 +5081,7 @@ function ProfilePage() {
     setError("");
     setFieldErrors({});
     try {
-      await request("/api/v1/users/me/profile", {
-        method: "PUT",
-        body: JSON.stringify(form),
-      });
+      await persistProfile();
       await refreshWorkspace();
       notify(`${friendlyRole(user?.role ?? "PUBLIC_USER")} profile saved.`);
     } catch (cause) {
@@ -4669,16 +5094,29 @@ function ProfilePage() {
     }
   };
   const submitForReview = async () => {
+    const details = validate();
+    if (Object.keys(details).length) {
+      setFieldErrors(details);
+      setError("Correct the highlighted profile fields before submitting.");
+      focusFirstError(details, "profile");
+      return;
+    }
     setBusy(true);
     setError("");
+    setFieldErrors({});
     try {
+      await persistProfile();
       await request("/api/v1/users/me/profile/submit", {
         method: "POST",
         body: "{}",
       });
+      await refreshWorkspace();
       setSubmitted(true);
     } catch (cause) {
+      const apiErrors = errorsFrom(cause);
+      setFieldErrors(apiErrors);
       setError(messageOf(cause));
+      focusFirstError(apiErrors, "profile");
     } finally {
       setBusy(false);
     }
@@ -4767,7 +5205,10 @@ function ProfilePage() {
               <Select
                 id="profile-identificationType"
                 value={form.identificationType}
-                onChange={(e) => update("identificationType", e.target.value)}
+                onChange={(e) => {
+                  update("identificationType", e.target.value);
+                  update("identificationNumber", "");
+                }}
               >
                 <option value="">Select identification type</option>
                 <option value="NATIONAL_ID">Rwanda National ID</option>
@@ -4784,19 +5225,74 @@ function ProfilePage() {
               <Input
                 id="profile-identificationNumber"
                 value={form.identificationNumber}
-                placeholder="Enter the number exactly as issued"
-                onChange={(e) => update("identificationNumber", e.target.value)}
+                inputMode={
+                  form.identificationType === "NATIONAL_ID"
+                    ? "numeric"
+                    : "text"
+                }
+                maxLength={
+                  form.identificationType === "NATIONAL_ID"
+                    ? 16
+                    : form.identificationType === "PASSPORT"
+                      ? 20
+                      : 30
+                }
+                placeholder={
+                  form.identificationType === "NATIONAL_ID"
+                    ? "16-digit Rwanda National ID"
+                    : form.identificationType === "PASSPORT"
+                      ? "Letters and numbers"
+                      : "Enter the number exactly as issued"
+                }
+                onChange={(e) => {
+                  const value =
+                    form.identificationType === "NATIONAL_ID"
+                      ? e.target.value.replace(/\D/g, "")
+                      : form.identificationType === "PASSPORT"
+                        ? e.target.value.replace(/[^A-Za-z\d]/g, "").toUpperCase()
+                        : e.target.value.replace(/[^A-Za-z\d /-]/g, "");
+                  update("identificationNumber", value);
+                }}
               />
             </Field>
+            {form.identificationType === "OTHER_GOVERNMENT_ID" && (
+              <Field
+                label="Identification document"
+                hint="Required for other government-issued identification. PDF, DOCX, JPG, PNG, or WEBP."
+                error={fieldErrors.identificationDocument}
+              >
+                <Input
+                  id="profile-identificationDocument"
+                  type="file"
+                  accept=".pdf,.docx,.jpg,.jpeg,.png,.webp"
+                  onChange={(event) => {
+                    setIdentificationDocument(event.target.files?.[0] ?? null);
+                    setFieldErrors((current) => ({
+                      ...current,
+                      identificationDocument: "",
+                    }));
+                  }}
+                />
+                {identificationDocuments.length > 0 && (
+                  <small>
+                    {identificationDocuments.length} document
+                    {identificationDocuments.length === 1 ? "" : "s"} already
+                    uploaded.
+                  </small>
+                )}
+              </Field>
+            )}
             <Field label="Phone number" error={fieldErrors.phoneNumber}>
               <Input
                 id="profile-phoneNumber"
                 value={form.phoneNumber}
                 type="tel"
+                inputMode="numeric"
+                maxLength={10}
                 autoComplete="tel"
-                placeholder="+250 7XX XXX XXX"
+                placeholder="07XXXXXXXX"
                 onChange={(e) =>
-                  update("phoneNumber", e.target.value.replaceAll(" ", ""))
+                  update("phoneNumber", e.target.value.replace(/\D/g, ""))
                 }
               />
             </Field>
@@ -5794,7 +6290,8 @@ const PartnerSearch = styled.div`
 `;
 const RecordList = styled.div`
   > a,
-  > div {
+  > div,
+  > button {
     min-height: 68px;
     padding: 13px 18px;
     border-bottom: 1px solid ${palette.line};
@@ -5804,6 +6301,19 @@ const RecordList = styled.div`
     align-items: center;
     &:last-child {
       border: 0;
+    }
+  }
+  > button {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    grid-template-columns: auto 1fr auto auto;
+    &:hover {
+      background: ${palette.soft};
     }
   }
   span {
@@ -6239,17 +6749,113 @@ const TagList = styled.div`
     font-weight: 500;
   }
 `;
+const CriteriaBuilder = styled.div`
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+`;
+const CriterionEditor = styled.section`
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid ${palette.line};
+  border-radius: 12px;
+  background: ${palette.paper};
+`;
+const CriterionNumber = styled.span`
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: ${palette.green};
+  color: white;
+  font-weight: 800;
+`;
+const CriterionFields = styled.div`
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(240px, 1.5fr) 120px;
+  gap: 12px;
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
+  }
+`;
+const CriteriaBuilderFooter = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  @media (max-width: 640px) {
+    align-items: stretch;
+    flex-direction: column;
+  }
+`;
+const WeightSummary = styled.div<{ $valid: boolean }>`
+  display: flex;
+  flex-direction: column;
+  color: ${({ $valid }) => ($valid ? palette.green : palette.danger)};
+  span {
+    color: ${palette.muted};
+    font-size: 12px;
+  }
+`;
+const CriteriaCardHeader = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  > div:first-of-type {
+    min-width: 0;
+  }
+  button {
+    flex: none;
+  }
+  @media (max-width: 520px) {
+    flex-direction: column;
+  }
+`;
+const ActiveCriteriaMark = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: ${palette.successSoft};
+  color: ${palette.green};
+  font-size: 12px;
+  font-weight: 800;
+  svg {
+    width: 17px;
+    height: 17px;
+  }
+`;
 const CriteriaList = styled.div`
   display: flex;
   flex-direction: column;
   margin-top: 14px;
-  div {
+  > div {
     display: flex;
     justify-content: space-between;
+    gap: 16px;
     border-top: 1px solid ${palette.line};
     padding: 10px 0;
     font-size: 12px;
   }
+  span {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  small {
+    line-height: 1.45;
+  }
+`;
+const CriteriaVersionMeta = styled.p`
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid ${palette.line};
 `;
 const ReportPre = styled.pre`
   white-space: pre-wrap;

@@ -18,26 +18,35 @@ export type Innovation = {
   metrics: Metric[];
   milestones: Array<Milestone & {id?:string;description?:string;visibility?:string}>;
   ownerId?: string; versionId?: string; createdAt?: string; updatedAt?: string; submittedAt?: string;
+  administratorReviewedAt?: string;
   ownershipDeclared?: boolean; accuracyDeclared?: boolean;
   supportingLinks: Array<{title:string;url:string}>;
   revisions?: Array<{id:string;field:string;instruction:string;response:string;dueAt:string;status:string}>;
-  assignment?: null | {id:string;expertId:string;expert:string;status:string;dueAt:string;createdAt:string};
+  assignment?: null | {id:string;expertId:string;expert:string;status:string;dueAt:string;createdAt:string;reviewHistory:ReviewRound[]};
 };
-export type ReviewScore = { criterionKey: string; score: number; comment: string };
+export type ReviewScore = { criterionKey: string; criterionName?: string; weight?: number; score: number; comment: string };
+export type ReviewRound = {
+  id:string;versionId:string;version:number;status:string;recommendation:string;totalScore:number|null;rationale:string;submittedAt:string;
+  scores:ReviewScore[];
+  revisionRequests:Array<{id?:string;fieldKey:string;instruction:string;response?:string;dueAt:string;status:string}>;
+};
 export type Assignment = {
   id: string; innovationId: string; innovation: string; version: number; expert: string; sector: string; district: string; status: string; dueAt: string;
   acceptedAt?: string; completedAt?: string; summary?: string; problem?: string; solution?: string; beneficiaries?: string; impact?: string;
   novelty?: string; currentEvidence?: string; implementationPlan?: string; scalability?: string; sustainability?: string; supportNeeded?: string;
+  supportingLinks?: Array<{title:string;url:string}>;
   evidence?: Array<{id:string;name:string;mimeType:string;sizeBytes:string}>;
   criteria?: Array<{key:string;name:string;guidance:string;weight:number}>;
-  review?: null | {id:string;status:string;recommendation:string;totalScore:number|null;rationale:string;scores:ReviewScore[];revisionRequests:Array<{fieldKey:string;instruction:string;dueAt:string;status:string}>;submittedAt:string};
+  review?: null | ReviewRound;
+  reviewHistory: ReviewRound[];
 };
+export type InnovationFeedback = { innovationId:string;innovation:string;status:string;expert:string;rounds:ReviewRound[] };
 export type Engagement = {
   id: string; innovationId:string; innovationSlug:string; innovation: string; partner: string; partnerId:string; innovator:string; ownerId:string;
   type: string; status: string; createdAt: string; updatedAt:string; summary: string; termsSummary:string; nonBindingAccepted:boolean;
   contact:{email:string;phone:string;organization:string};
 };
-export type Notification = { id: string; title: string; message: string; time: string; read: boolean; type: string };
+export type Notification = { id: string; title: string; message: string; time: string; read: boolean; type: string; entityType:string; entityId:string; actionPath:string };
 export type Revision = { id: string; innovationId?: string; innovation: string; field: string; instruction: string; response?: string; dueAt: string; status: string };
 export type PlatformData = {
   users: Account[];

@@ -18,8 +18,6 @@ export const createEngagementSchema = request({
 export const respondEngagementSchema = request({
   params: engagementParams,
   body: z.object({
-    status: z.enum(['ACCEPTED', 'DECLINED', 'CLARIFICATION_REQUESTED']),
-    shareEmail: z.boolean().default(false),
-    sharePhone: z.boolean().default(false)
+    status: z.enum(['ACCEPTED', 'DECLINED', 'CLARIFICATION_REQUESTED'])
   }).strict()
 });

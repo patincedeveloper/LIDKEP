@@ -1,3 +1,7 @@
+import { createHash } from 'node:crypto';
+import { createReadStream } from 'node:fs';
+import { readFile, unlink } from 'node:fs/promises';
+import path from 'node:path';
 import { prisma } from '../config/database.js';
 import { serializeUser } from './auth.service.js';
 import { getPublicBootstrap, serializeInnovation } from './public.service.js';
@@ -7,6 +11,65 @@ import { AppError } from '../lib/http.js';
 import { isProfileComplete } from './auth.service.js';
 import { listAssignments } from './reviews.service.js';
 import { listEngagements } from './engagements.service.js';
+import { serializeNotification } from './notification.service.js';
+import { uploadDirectory } from '../middleware/upload.js';
+
+export const serializeProfileEvidence = (file) => ({
+  id: file.id,
+  name: file.originalName,
+  mimeType: file.mimeType,
+  sizeBytes: String(file.sizeBytes),
+  createdAt: file.createdAt.toISOString()
+});
+
+export async function addProfileEvidence(user, file) {
+  if (!file) throw new AppError(422, 'FILE_REQUIRED', 'Choose one supported identification document to upload.');
+  try {
+    const verification = await prisma.verificationRequest.findFirst({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+      include: { evidenceFiles: { select: { id: true } } }
+    });
+    if (!verification) throw new AppError(404, 'VERIFICATION_NOT_FOUND', 'The account approval request was not found.');
+    if (!['DRAFT', 'REJECTED'].includes(verification.status)) {
+      throw new AppError(409, 'PROFILE_NOT_EDITABLE', 'Identification documents cannot be changed while the profile is under review or already approved.');
+    }
+    if (verification.evidenceFiles.length >= 5) {
+      throw new AppError(422, 'PROFILE_EVIDENCE_LIMIT', 'A maximum of 5 identification documents can be uploaded.');
+    }
+    const checksumSha256 = createHash('sha256').update(await readFile(file.path)).digest('hex');
+    const evidence = await prisma.evidenceFile.create({
+      data: {
+        uploadedById: user.id,
+        verificationRequestId: verification.id,
+        originalName: file.originalname.slice(0, 255),
+        storageKey: file.filename,
+        mimeType: file.mimetype,
+        sizeBytes: BigInt(file.size),
+        checksumSha256,
+        visibility: 'ADMIN_ONLY',
+        scanStatus: 'CLEAN'
+      }
+    });
+    return serializeProfileEvidence(evidence);
+  } catch (error) {
+    await unlink(file.path).catch(() => {});
+    throw error;
+  }
+}
+
+export async function getProfileEvidenceDownload(user, evidenceId) {
+  const evidence = await prisma.evidenceFile.findFirst({
+    where: { id: evidenceId, verificationRequestId: { not: null } },
+    include: { verificationRequest: { select: { userId: true } } }
+  });
+  const allowed = evidence && (
+    evidence.verificationRequest?.userId === user.id || user.role.code === 'SYSTEM_ADMINISTRATOR'
+  );
+  if (!allowed) throw new AppError(404, 'PROFILE_EVIDENCE_NOT_FOUND', 'The identification document was not found.');
+  const filePath = path.join(uploadDirectory, evidence.storageKey);
+  return { evidence, stream: createReadStream(filePath), filePath };
+}
 
 export async function submitProfileForReview(user, requestId) {
   const current = await usersRepository.findById(user.id);
@@ -15,6 +78,14 @@ export async function submitProfileForReview(user, requestId) {
   }
   const verification = current.verificationRequests?.[0];
   if (!verification) throw new AppError(404, 'VERIFICATION_NOT_FOUND', 'The account approval request was not found.');
+  if (current.profile.identificationType === 'OTHER_GOVERNMENT_ID') {
+    const evidenceCount = await prisma.evidenceFile.count({ where: { verificationRequestId: verification.id } });
+    if (!evidenceCount) {
+      throw new AppError(422, 'IDENTIFICATION_DOCUMENT_REQUIRED', 'Upload the selected government-issued identification document before submitting your profile.', {
+        fieldErrors: [{ field: 'identificationDocument', message: 'Upload the selected government-issued identification document.', code: 'required' }]
+      });
+    }
+  }
   if (verification.status === 'PENDING_APPROVAL') {
     throw new AppError(409, 'PROFILE_ALREADY_UNDER_REVIEW', 'Your profile is already under review.');
   }
@@ -62,8 +133,19 @@ export async function getWorkspaceBootstrap(user) {
     where: innovationWhere,
     include: {
       owner: { include: { profile: true } },
-      publishedVersion: true,
-      versions: { orderBy: { versionNumber: 'desc' }, take: 1, include: { evidenceFiles: true, revisionRequests: true } },
+      publishedVersion: user.role.code === 'INNOVATOR' || user.role.code === 'SYSTEM_ADMINISTRATOR'
+        ? true
+        : { include: { evidenceFiles: { where: { visibility: 'PUBLIC', scanStatus: 'CLEAN' }, orderBy: { createdAt: 'desc' } } } },
+      versions: user.role.code === 'INNOVATOR' || user.role.code === 'SYSTEM_ADMINISTRATOR'
+        ? { orderBy: { versionNumber: 'desc' }, include: { evidenceFiles: true, revisionRequests: true } }
+        : {
+            where: { immutableAt: { not: null } },
+            orderBy: { versionNumber: 'desc' },
+            include: {
+              evidenceFiles: { where: { visibility: 'PUBLIC', scanStatus: 'CLEAN' }, orderBy: { createdAt: 'desc' } },
+              revisionRequests: false
+            }
+          },
       milestones: { orderBy: { createdAt: 'desc' } }
     }
   }) : [];
@@ -102,9 +184,7 @@ export async function getWorkspaceBootstrap(user) {
       status: revision.status
     }))),
     engagements,
-    notifications: notifications.map((item) => ({
-      id: item.id, title: item.title, message: item.message, time: item.createdAt.toISOString(), read: Boolean(item.readAt), type: item.type
-    })),
+    notifications: notifications.map((item) => serializeNotification(item, user.role.code)),
     verifications: verificationRecords.filter((item) => item.user).map((item) => ({ id: item.id, name: item.user.profile?.displayName ?? item.user.email, organization: item.user.profile?.organization ?? '', role: item.requestedRole, status: item.status, evidence: item.evidenceFiles.length })),
     criteria: criteriaRecords.map((item) => ({ id: item.id, version: item.version, name: item.name, status: item.status, criteria: item.criteria.map((criterion) => ({ name: criterion.name, weight: Number(criterion.weight), guidance: criterion.guidance ?? '' })), weights: Object.fromEntries(item.criteria.map((criterion) => [criterion.name, Number(criterion.weight)])) }))
   };

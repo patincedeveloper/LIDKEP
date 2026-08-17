@@ -9,6 +9,5 @@ export const reviewsRouter = Router();
 reviewsRouter.use(authenticate, authorize('EXPERT'));
 reviewsRouter.get('/assignments', validate(reviewEmptySchema), controller.assignments);
 reviewsRouter.get('/assignments/:assignmentId', validate(assignmentSchema), controller.assignment);
-reviewsRouter.post('/assignments/:assignmentId/accept', validate(assignmentSchema), controller.accept);
 reviewsRouter.put('/assignments/:assignmentId', validate(saveReviewSchema), controller.save);
 reviewsRouter.post('/assignments/:assignmentId/submit', validate(submitReviewSchema), controller.submit);

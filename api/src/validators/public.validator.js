@@ -26,3 +26,12 @@ export const publicInnovationDetailSchema = z.object({
   params: z.object({ slug: z.string().trim().min(1).max(160).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/) }),
   query: emptyObject
 });
+
+export const publicEvidenceDownloadSchema = z.object({
+  body: z.unknown().optional(),
+  params: z.object({
+    slug: z.string().trim().min(1).max(160).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+    evidenceId: z.string().uuid()
+  }).strict(),
+  query: emptyObject
+});

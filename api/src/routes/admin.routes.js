@@ -11,7 +11,6 @@ import {
   createCriteriaSchema,
   createTaxonomySchema,
   createUserSchema,
-  decideInnovationSchema,
   decideVerificationSchema,
   updateSettingsSchema,
   updateTaxonomySchema,
@@ -61,15 +60,20 @@ adminRouter.get(
   validate(adminEmptySchema),
   controller.innovations,
 );
+adminRouter.get(
+  "/innovations/:id",
+  validate(adminIdSchema),
+  controller.innovation,
+);
 adminRouter.post(
   "/innovations",
   validate(createAdminInnovationSchema),
   controller.createInnovation,
 );
 adminRouter.post(
-  "/innovations/:id/decision",
-  validate(decideInnovationSchema),
-  controller.decideInnovation,
+  "/innovations/:id/archive",
+  validate(adminIdSchema),
+  controller.archiveInnovation,
 );
 adminRouter.post(
   "/innovations/:id/assignments",
@@ -101,6 +105,11 @@ adminRouter.post(
   "/criteria",
   validate(createCriteriaSchema),
   controller.createCriteria,
+);
+adminRouter.post(
+  "/criteria/:id/activate",
+  validate(adminIdSchema),
+  controller.activateCriteria,
 );
 adminRouter.get(
   "/reports/summary",

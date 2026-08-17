@@ -7,6 +7,7 @@ import { AppError } from '../lib/http.js';
 import { createNotification, notifySystemAdministrators } from './notification.service.js';
 import { uploadDirectory } from '../middleware/upload.js';
 import { isProfileComplete } from './auth.service.js';
+import { countWords, PROJECT_COVERAGE_LEVELS } from '../validators/common.validator.js';
 
 const editableStatuses = ['DRAFT', 'REVISION_REQUIRED'];
 const versionFields = [
@@ -18,15 +19,28 @@ const requiredVersionFields = versionFields.filter((field) => field !== 'current
 const submissionFieldLabels = {
   title: 'Innovation title', summary: 'Short summary', problem: 'Problem or need',
   solution: 'Proposed solution', beneficiaries: 'Main beneficiaries', sector: 'Innovation sector',
-  category: 'Innovation type', district: 'Project district', maturity: 'Maturity level',
+  category: 'Innovation type', district: 'Project coverage', maturity: 'Maturity level',
   impactArea: 'Primary impact area', impact: 'Expected impact', novelty: 'What is new or different',
   implementationPlan: 'Implementation plan', scalability: 'Potential to scale',
   sustainability: 'Sustainability', supportNeeded: 'Support requested'
 };
+const narrativeVersionFields = [
+  'summary', 'problem', 'solution', 'beneficiaries', 'impact', 'novelty',
+  'currentEvidence', 'implementationPlan', 'scalability', 'sustainability', 'supportNeeded'
+];
 
 const includeInnovation = {
   owner: { include: { profile: true } },
-  expertAssignment: { include: { expert: { include: { profile: true } } } },
+  administratorReview: true,
+  expertAssignment: {
+    include: {
+      expert: { include: { profile: true } },
+      reviews: {
+        include: { version: true, scores: true, revisionRequests: true },
+        orderBy: { createdAt: 'desc' }
+      }
+    }
+  },
   versions: {
     orderBy: { versionNumber: 'desc' },
     include: { evidenceFiles: { orderBy: { createdAt: 'desc' } }, revisionRequests: true }
@@ -65,10 +79,42 @@ export function serializeEvidence(file) {
   };
 }
 
+function serializeFeedbackReview(review) {
+  return {
+    id: review.id,
+    versionId: review.versionId,
+    version: review.version?.versionNumber ?? 0,
+    status: review.status,
+    recommendation: review.recommendation ?? '',
+    totalScore: review.totalScore === null ? null : Number(review.totalScore),
+    rationale: review.rationale ?? '',
+    submittedAt: review.submittedAt?.toISOString() ?? '',
+    scores: review.scores.map((score) => ({
+      criterionKey: score.criterionKey,
+      criterionName: score.criterionName,
+      weight: Number(score.weight),
+      score: Number(score.score),
+      comment: score.comment ?? ''
+    })),
+    revisionRequests: review.revisionRequests.map((revision) => ({
+      id: revision.id,
+      fieldKey: revision.fieldKey,
+      instruction: revision.instruction,
+      response: revision.response ?? '',
+      dueAt: revision.dueAt?.toISOString() ?? '',
+      status: revision.status
+    }))
+  };
+}
+
 export function serializeWorkspaceInnovation(innovation) {
   const version = innovation.versions?.[0] ?? innovation.publishedVersion;
   if (!version) return null;
   const assignment = innovation.expertAssignment;
+  const evidenceFiles = Array.from(new Map(
+    (innovation.versions?.flatMap((item) => item.evidenceFiles ?? []) ?? version.evidenceFiles ?? [])
+      .map((file) => [file.id, file])
+  ).values());
   return {
     id: innovation.id,
     slug: innovation.slug,
@@ -98,6 +144,9 @@ export function serializeWorkspaceInnovation(innovation) {
     createdAt: innovation.createdAt.toISOString(),
     updatedAt: innovation.updatedAt.toISOString(),
     submittedAt: version.submittedAt?.toISOString() ?? '',
+    administratorReviewedAt: innovation.administratorReview?.versionId === version.id
+      ? innovation.administratorReview.reviewedAt.toISOString()
+      : '',
     version: version.versionNumber,
     versionId: version.id,
     completion: version.completionPercent,
@@ -106,7 +155,7 @@ export function serializeWorkspaceInnovation(innovation) {
     views: 0,
     saves: 0,
     imageTone: 'mint',
-    evidence: (version.evidenceFiles ?? []).map(serializeEvidence),
+    evidence: evidenceFiles.map(serializeEvidence),
     metrics: Array.isArray(version.metrics) ? version.metrics : [],
     milestones: (innovation.milestones ?? []).map((item) => ({
       id: item.id,
@@ -130,7 +179,8 @@ export function serializeWorkspaceInnovation(innovation) {
       expert: assignment.expert?.profile?.displayName ?? assignment.expert?.email ?? 'Assigned Expert',
       status: assignment.status,
       dueAt: assignment.dueAt?.toISOString() ?? '',
-      createdAt: assignment.createdAt.toISOString()
+      createdAt: assignment.createdAt.toISOString(),
+      reviewHistory: (assignment.reviews ?? []).filter((review) => review.status === 'SUBMITTED').map(serializeFeedbackReview)
     } : null
   };
 }
@@ -158,7 +208,9 @@ async function ensureEditableVersion(innovation, tx = prisma) {
       ownerDisplaySnapshot: latest.ownerDisplaySnapshot,
       metrics: latest.metrics,
       supportingLinks: latest.supportingLinks,
-      completionPercent: latest.completionPercent
+      completionPercent: latest.completionPercent,
+      ownershipDeclaredAt: latest.ownershipDeclaredAt,
+      accuracyDeclaredAt: latest.accuracyDeclaredAt
     }
   });
 }
@@ -241,22 +293,72 @@ export async function submitInnovation(user, id, requestId) {
     throw new AppError(422, 'INNOVATOR_PROFILE_INCOMPLETE', 'Complete your Innovator profile before submitting an innovation.');
   }
   const version = innovation.versions[0];
+  const revising = innovation.status === 'REVISION_REQUIRED';
   const completion = completionFor(version);
-  if (completion < 100) {
-    const fieldErrors = requiredVersionFields
-      .filter((field) => !String(version[field] ?? '').trim())
-      .map((field) => ({ field, message: `${submissionFieldLabels[field]} is required before submission.`, code: 'required' }));
-    if (!version.ownershipDeclaredAt) fieldErrors.push({ field: 'ownershipDeclared', message: 'Confirm that you own or are authorized to submit this innovation.', code: 'required' });
-    if (!version.accuracyDeclaredAt) fieldErrors.push({ field: 'accuracyDeclared', message: 'Confirm that the information is accurate.', code: 'required' });
+  const fieldErrors = requiredVersionFields
+    .filter((field) => !String(version[field] ?? '').trim())
+    .map((field) => ({ field, message: `${submissionFieldLabels[field]} is required before submission.`, code: 'required' }));
+  for (const field of narrativeVersionFields) {
+    const value = String(version[field] ?? '').trim();
+    if (!value) continue;
+    const words = countWords(value);
+    if (words < 30) fieldErrors.push({ field, message: `${submissionFieldLabels[field] ?? 'This field'} must contain at least 30 words.`, code: 'too_small' });
+    if (words > 1000) fieldErrors.push({ field, message: `${submissionFieldLabels[field] ?? 'This field'} must contain 1,000 words or fewer.`, code: 'too_big' });
+  }
+  if (version.district && !PROJECT_COVERAGE_LEVELS.includes(version.district)) {
+    fieldErrors.push({ field: 'district', message: 'Select a valid project coverage level.', code: 'invalid_enum_value' });
+  }
+  if (!version.ownershipDeclaredAt) fieldErrors.push({ field: 'ownershipDeclared', message: 'Confirm that you own or are authorized to submit this innovation.', code: 'required' });
+  if (!version.accuracyDeclaredAt) fieldErrors.push({ field: 'accuracyDeclared', message: 'Confirm that the information is accurate.', code: 'required' });
+  if (completion < 100 || fieldErrors.length) {
     throw new AppError(422, 'INNOVATION_INCOMPLETE', 'Correct the highlighted fields before submitting.', { fieldErrors });
   }
   await prisma.$transaction(async (tx) => {
     await tx.innovationVersion.update({ where: { id: version.id }, data: { completionPercent: 100, submittedAt: new Date(), immutableAt: new Date() } });
-    await tx.innovation.update({ where: { id }, data: { status: 'SUBMITTED' } });
-    await notifySystemAdministrators({
-      type: 'INNOVATION_SUBMITTED', title: 'Innovation submitted',
-      message: `${version.title} is ready for administrator review.`, entityType: 'Innovation', entityId: id
-    }, tx);
+    if (revising) {
+      const assignment = innovation.expertAssignment;
+      if (!assignment) throw new AppError(409, 'EXPERT_ASSIGNMENT_REQUIRED', 'The revised innovation has no Expert assignment.');
+      const previousReview = assignment.reviews.find((review) => review.versionId === assignment.versionId && review.status === 'SUBMITTED');
+      if (!previousReview) throw new AppError(409, 'SUBMITTED_REVIEW_REQUIRED', 'The previous Expert review could not be found.');
+      await tx.revisionRequest.updateMany({
+        where: { review: { assignmentId: assignment.id }, status: { in: ['OPEN', 'RESPONDED'] } },
+        data: { status: 'RESOLVED', resolvedAt: new Date() }
+      });
+      await tx.expertAssignment.update({
+        where: { id: assignment.id },
+        data: { versionId: version.id, status: 'ASSIGNED', completedAt: null }
+      });
+      await tx.review.create({
+        data: {
+          assignmentId: assignment.id,
+          versionId: version.id,
+          reviewerId: assignment.expertId,
+          criteriaVersionId: previousReview.criteriaVersionId
+        }
+      });
+      await tx.innovation.update({ where: { id }, data: { status: 'UNDER_REVIEW' } });
+      await createNotification({
+        userId: assignment.expertId,
+        type: 'INNOVATION_REVISION_RESUBMITTED',
+        title: 'Revised innovation ready for review',
+        message: `${version.title} was improved and resubmitted for your review.`,
+        entityType: 'ExpertAssignment',
+        entityId: assignment.id
+      }, tx);
+      await notifySystemAdministrators({
+        type: 'INNOVATION_REVISION_RESUBMITTED',
+        title: 'Innovation revision resubmitted',
+        message: `${version.title} returned to the assigned Expert for another review round.`,
+        entityType: 'Innovation',
+        entityId: id
+      }, tx);
+    } else {
+      await tx.innovation.update({ where: { id }, data: { status: 'SUBMITTED' } });
+      await notifySystemAdministrators({
+        type: 'INNOVATION_SUBMITTED', title: 'Innovation submitted',
+        message: `${version.title} is ready for administrator review.`, entityType: 'Innovation', entityId: id
+      }, tx);
+    }
   });
   return serializeWorkspaceInnovation(await findAccessibleInnovation(id, user));
 }
@@ -313,11 +415,42 @@ export async function addEvidence(user, id, file, visibility, requestId) {
 }
 
 export async function getEvidenceDownload(user, id, evidenceId) {
-  await findAccessibleInnovation(id, user);
   const evidence = await prisma.evidenceFile.findFirst({
-    where: { id: evidenceId, innovationVersion: { innovationId: id } }
+    where: { id: evidenceId, innovationVersion: { innovationId: id } },
+    include: {
+      innovationVersion: {
+        include: { innovation: { include: { expertAssignment: true } } }
+      }
+    }
   });
   if (!evidence) throw new AppError(404, 'EVIDENCE_NOT_FOUND', 'The evidence file was not found.');
+  const innovation = evidence.innovationVersion.innovation;
+  const administrator = user.role.code === 'SYSTEM_ADMINISTRATOR';
+  const owner = innovation.ownerId === user.id;
+  const assignedExpert = user.role.code === 'EXPERT' && innovation.expertAssignment?.expertId === user.id;
+  const expertVisible = ['PUBLIC', 'AUTHENTICATED', 'REVIEW_TEAM'].includes(evidence.visibility) && evidence.scanStatus === 'CLEAN';
+  if (!administrator && !owner && !(assignedExpert && expertVisible)) {
+    throw new AppError(404, 'EVIDENCE_NOT_FOUND', 'The evidence file was not found.');
+  }
+  const filePath = path.join(uploadDirectory, evidence.storageKey);
+  return { evidence, stream: createReadStream(filePath), filePath };
+}
+
+export async function getPublicEvidenceDownload(slug, evidenceId) {
+  const evidence = await prisma.evidenceFile.findFirst({
+    where: {
+      id: evidenceId,
+      visibility: 'PUBLIC',
+      scanStatus: 'CLEAN',
+      innovationVersion: {
+        innovation: { slug, status: 'PUBLISHED', publishedVersionId: { not: null } }
+      }
+    },
+    include: {
+      innovationVersion: true
+    }
+  });
+  if (!evidence) throw new AppError(404, 'EVIDENCE_NOT_FOUND', 'The public evidence file was not found.');
   const filePath = path.join(uploadDirectory, evidence.storageKey);
   return { evidence, stream: createReadStream(filePath), filePath };
 }
@@ -337,6 +470,33 @@ export async function respondToRevision(user, id, revisionId, response, requestI
 
 export async function getInnovation(user, id) {
   return serializeWorkspaceInnovation(await findAccessibleInnovation(id, user));
+}
+
+export async function listFeedback(user) {
+  if (user.role.code !== 'INNOVATOR') throw new AppError(403, 'FORBIDDEN', 'Only Innovators can view owned innovation feedback.');
+  const innovations = await prisma.innovation.findMany({
+    where: { ownerId: user.id, expertAssignment: { isNot: null } },
+    include: {
+      versions: { orderBy: { versionNumber: 'desc' }, take: 1 },
+      expertAssignment: {
+        include: {
+          expert: { include: { profile: true } },
+          reviews: {
+            include: { version: true, scores: true, revisionRequests: true },
+            orderBy: { createdAt: 'desc' }
+          }
+        }
+      }
+    },
+    orderBy: { updatedAt: 'desc' }
+  });
+  return innovations.map((innovation) => ({
+    innovationId: innovation.id,
+    innovation: innovation.versions[0]?.title ?? 'Innovation',
+    status: innovation.status,
+    expert: innovation.expertAssignment?.expert.profile?.displayName ?? innovation.expertAssignment?.expert.email ?? 'Assigned Expert',
+    rounds: (innovation.expertAssignment?.reviews ?? []).filter((review) => review.status === 'SUBMITTED').map(serializeFeedbackReview)
+  }));
 }
 
 export async function listInnovations(user) {

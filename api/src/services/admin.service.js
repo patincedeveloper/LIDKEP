@@ -9,7 +9,21 @@ import { uploadDirectory } from '../middleware/upload.js';
 
 const innovationInclude = {
   owner: { include: { profile: true } },
-  expertAssignment: { include: { expert: { include: { profile: true } } } },
+  administratorReview: true,
+  expertAssignment: {
+    include: {
+      expert: { include: { profile: true } },
+      reviews: {
+        include: {
+          version: true,
+          scores: true,
+          revisionRequests: true,
+          criteriaVersion: { include: { criteria: { orderBy: { sortOrder: 'asc' } } } }
+        },
+        orderBy: { createdAt: 'desc' }
+      }
+    }
+  },
   versions: { orderBy: { versionNumber: 'desc' }, include: { evidenceFiles: true, revisionRequests: true } },
   milestones: { orderBy: { createdAt: 'desc' } },
   publishedVersion: true
@@ -18,7 +32,6 @@ const innovationInclude = {
 const codeFor = (value) => value.toUpperCase().replace(/&/g, 'AND').replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
 const humanRole = (code) => ({ EXPERT: 'Expert', INVESTOR_PARTNER: 'Investor / Industry Partner', INNOVATOR: 'Innovator' }[code] ?? code);
 const userInclude = { role: true, profile: true };
-const expertAssignableStatuses = ['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'PUBLISHED'];
 
 function serializeAdminUser(user) {
   return {
@@ -73,7 +86,7 @@ export async function getDashboard() {
     prisma.user.count({ where: { deletedAt: null } }),
     prisma.verificationRequest.count({ where: { status: 'PENDING_APPROVAL' } }),
     prisma.innovation.count(),
-    prisma.innovation.count({ where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'APPROVED'] } } }),
+    prisma.innovation.count({ where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'REVISION_REQUIRED'] } } }),
     prisma.innovation.count({ where: { status: 'PUBLISHED' } })
   ]);
   return { counts: { users, pendingVerifications, innovations, submitted, published } };
@@ -258,40 +271,38 @@ export async function listInnovations() {
   return records.map(serializeWorkspaceInnovation).filter(Boolean);
 }
 
+export async function getInnovationForReview(admin, id) {
+  const innovation = await prisma.innovation.findUnique({ where: { id }, include: innovationInclude });
+  if (!innovation) throw new AppError(404, 'INNOVATION_NOT_FOUND', 'The innovation was not found.');
+  const latest = innovation.versions[0];
+  if (innovation.status === 'SUBMITTED' && latest?.immutableAt && innovation.administratorReview?.versionId !== latest.id) {
+    await prisma.innovationAdministratorReview.upsert({
+      where: { innovationId: innovation.id },
+      update: { versionId: latest.id, reviewedById: admin.id, reviewedAt: new Date() },
+      create: { innovationId: innovation.id, versionId: latest.id, reviewedById: admin.id }
+    });
+  }
+  const reviewed = await prisma.innovation.findUnique({ where: { id }, include: innovationInclude });
+  return serializeWorkspaceInnovation(reviewed);
+}
+
 export async function createInnovation(admin, input, requestId) {
   return createInnovationAsAdministrator(admin, input, requestId);
 }
 
-export async function decideInnovation(admin, id, input, requestId) {
+export async function archiveInnovation(admin, id, requestId) {
   const innovation = await prisma.innovation.findUnique({ where: { id }, include: innovationInclude });
   if (!innovation) throw new AppError(404, 'INNOVATION_NOT_FOUND', 'The innovation was not found.');
+  if (innovation.status === 'ARCHIVED') throw new AppError(409, 'INNOVATION_ALREADY_ARCHIVED', 'This innovation is already archived.');
   const latest = innovation.versions[0];
-  if (!latest) throw new AppError(409, 'INNOVATION_VERSION_MISSING', 'The innovation has no version to decide.');
-  const transitions = {
-    SUBMITTED: ['UNDER_REVIEW', 'REVISION_REQUIRED', 'APPROVED', 'REJECTED'],
-    UNDER_REVIEW: ['REVISION_REQUIRED', 'APPROVED', 'REJECTED'],
-    REVISION_REQUIRED: ['UNDER_REVIEW', 'APPROVED', 'REJECTED'],
-    RECOMMENDED: ['REVISION_REQUIRED', 'APPROVED', 'REJECTED'],
-    APPROVED: ['PUBLISHED', 'ARCHIVED'],
-    PUBLISHED: ['ARCHIVED'],
-    REJECTED: ['ARCHIVED'],
-    DRAFT: ['ARCHIVED']
-  };
-  if (!(transitions[innovation.status] ?? []).includes(input.status)) {
-    throw new AppError(409, 'INVALID_INNOVATION_TRANSITION', `An innovation cannot move from ${innovation.status} to ${input.status}.`);
-  }
   await prisma.$transaction(async (tx) => {
     await tx.innovation.update({
       where: { id },
-      data: {
-        status: input.status,
-        ...(input.status === 'PUBLISHED' ? { publishedVersionId: latest.id, publishedAt: new Date() } : {}),
-        ...(input.status === 'ARCHIVED' ? { archivedAt: new Date() } : {})
-      }
+      data: { status: 'ARCHIVED', archivedAt: new Date() }
     });
     await createNotification({
-      userId: innovation.ownerId, type: 'INNOVATION_STATUS_CHANGED', title: 'Innovation status updated',
-      message: `${latest.title} is now ${input.status.replaceAll('_', ' ').toLowerCase()}.`,
+      userId: innovation.ownerId, type: 'INNOVATION_ARCHIVED', title: 'Innovation archived',
+      message: `${latest?.title ?? 'Your innovation'} was archived by the System Administrator.`,
       entityType: 'Innovation', entityId: id
     }, tx);
   });
@@ -304,6 +315,7 @@ export async function assignExpert(admin, innovationId, input, requestId) {
     where: { id: innovationId },
     include: {
       expertAssignment: { include: { expert: { include: { profile: true } } } },
+      administratorReview: true,
       versions: { orderBy: { versionNumber: 'desc' }, take: 1 }
     }
   });
@@ -314,14 +326,20 @@ export async function assignExpert(admin, innovationId, input, requestId) {
   }
   const version = innovation.versions[0];
   if (!version?.immutableAt) throw new AppError(409, 'IMMUTABLE_VERSION_REQUIRED', 'Submit and freeze the innovation before assigning an Expert.');
-  if (!expertAssignableStatuses.includes(innovation.status)) {
-    throw new AppError(409, 'INNOVATION_NOT_ASSIGNABLE', 'Only a submitted, under-review, approved, or published innovation can be assigned for Expert review.');
+  if (innovation.status !== 'SUBMITTED') throw new AppError(409, 'INNOVATION_NOT_ASSIGNABLE', 'Only a submitted innovation can be assigned for Expert review.');
+  if (innovation.administratorReview?.versionId !== version.id) {
+    throw new AppError(409, 'INNOVATION_REVIEW_REQUIRED', 'Review the complete innovation information before assigning an Expert.');
   }
   const expert = await prisma.user.findFirst({
     where: { id: input.expertId, status: 'ACTIVE', deletedAt: null, role: { code: 'EXPERT' } },
     include: { profile: true }
   });
   if (!expert) throw new AppError(422, 'APPROVED_EXPERT_REQUIRED', 'Select an approved active Expert.');
+  const criteriaVersion = await prisma.evaluationCriteriaVersion.findFirst({
+    where: { status: 'ACTIVE' },
+    orderBy: { activatedAt: 'desc' }
+  });
+  if (!criteriaVersion) throw new AppError(409, 'ACTIVE_CRITERIA_REQUIRED', 'Activate evaluation criteria before assigning an Expert.');
   let assignment;
   try {
     assignment = await prisma.$transaction(async (tx) => {
@@ -332,11 +350,18 @@ export async function assignExpert(admin, innovationId, input, requestId) {
           expertId: expert.id,
           assignedById: admin.id,
           dueAt: input.dueAt ? new Date(`${input.dueAt}T23:59:59.999Z`) : null
+        },
+        include: { expert: true }
+      });
+      await tx.review.create({
+        data: {
+          assignmentId: created.id,
+          versionId: version.id,
+          reviewerId: expert.id,
+          criteriaVersionId: criteriaVersion.id
         }
       });
-      if (innovation.status === 'SUBMITTED') {
-        await tx.innovation.update({ where: { id: innovationId }, data: { status: 'UNDER_REVIEW' } });
-      }
+      await tx.innovation.update({ where: { id: innovationId }, data: { status: 'UNDER_REVIEW' } });
       await createNotification({
         userId: expert.id,
         type: 'EXPERT_ASSIGNMENT_CREATED',
@@ -344,6 +369,14 @@ export async function assignExpert(admin, innovationId, input, requestId) {
         message: `${version.title} is ready for your evaluation.`,
         entityType: 'ExpertAssignment',
         entityId: created.id
+      }, tx);
+      await createNotification({
+        userId: innovation.ownerId,
+        type: 'INNOVATION_ASSIGNED_TO_EXPERT',
+        title: 'Innovation under Expert review',
+        message: `${version.title} was reviewed by the System Administrator and assigned to an Expert.`,
+        entityType: 'Innovation',
+        entityId: innovationId
       }, tx);
       return created;
     }, { isolationLevel: 'Serializable' });
@@ -401,23 +434,89 @@ export async function updateTaxonomy(admin, id, input, requestId) {
 
 export async function listCriteria() {
   const records = await prisma.evaluationCriteriaVersion.findMany({ include: { criteria: { orderBy: { sortOrder: 'asc' } } }, orderBy: { createdAt: 'desc' } });
-  return records.map((item) => ({
-    id: item.id, version: item.version, name: item.name, status: item.status,
-    criteria: item.criteria.map((criterion) => ({ id: criterion.id, name: criterion.name, guidance: criterion.guidance ?? '', weight: Number(criterion.weight) }))
-  }));
+  return records
+    .sort((left, right) => Number(right.status === 'ACTIVE') - Number(left.status === 'ACTIVE'))
+    .map(serializeCriteriaVersion);
 }
 
 export async function createCriteria(admin, input, requestId) {
-  const record = await prisma.$transaction(async (tx) => {
-    const created = await tx.evaluationCriteriaVersion.create({
+  const keys = input.criteria.map((item) => codeFor(item.name));
+  if (new Set(keys).size !== keys.length) {
+    throw new AppError(422, 'CRITERIA_NAMES_DUPLICATE', 'Use a distinct name for every evaluation criterion.');
+  }
+  try {
+    const record = await prisma.evaluationCriteriaVersion.create({
       data: {
         version: input.version, name: input.name, status: 'DRAFT', createdById: admin.id,
-        criteria: { create: input.criteria.map((item, index) => ({ ...item, key: codeFor(item.name), sortOrder: index })) }
-      }, include: { criteria: true }
+        criteria: {
+          create: input.criteria.map((item, index) => ({
+            ...item,
+            guidance: item.guidance || null,
+            key: keys[index],
+            sortOrder: index
+          }))
+        }
+      },
+      include: { criteria: { orderBy: { sortOrder: 'asc' } } }
     });
-    return created;
+    return serializeCriteriaVersion(record);
+  } catch (error) {
+    if (error?.code === 'P2002') {
+      throw new AppError(409, 'CRITERIA_VERSION_EXISTS', 'Choose a unique criteria version identifier.');
+    }
+    throw error;
+  }
+}
+
+function serializeCriteriaVersion(item) {
+  return {
+    id: item.id,
+    version: item.version,
+    name: item.name,
+    status: item.status,
+    activatedAt: item.activatedAt?.toISOString() ?? '',
+    retiredAt: item.retiredAt?.toISOString() ?? '',
+    createdAt: item.createdAt.toISOString(),
+    criteria: item.criteria.map((criterion) => ({
+      id: criterion.id,
+      name: criterion.name,
+      guidance: criterion.guidance ?? '',
+      weight: Number(criterion.weight)
+    }))
+  };
+}
+
+export async function activateCriteria(admin, id, requestId) {
+  const target = await prisma.evaluationCriteriaVersion.findUnique({
+    where: { id },
+    include: { criteria: { orderBy: { sortOrder: 'asc' } } }
   });
-  return record;
+  if (!target) throw new AppError(404, 'CRITERIA_VERSION_NOT_FOUND', 'The evaluation criteria version was not found.');
+  if (target.status === 'ACTIVE') return serializeCriteriaVersion(target);
+  const totalWeight = target.criteria.reduce((sum, criterion) => sum + Number(criterion.weight), 0);
+  if (target.criteria.length < 2 || Math.abs(totalWeight - 100) >= 0.001) {
+    throw new AppError(409, 'CRITERIA_VERSION_INVALID', 'The criteria version must contain at least two criteria with weights totaling 100%.');
+  }
+  try {
+    const activated = await prisma.$transaction(async (tx) => {
+      const now = new Date();
+      await tx.evaluationCriteriaVersion.updateMany({
+        where: { status: 'ACTIVE', id: { not: id } },
+        data: { status: 'RETIRED', retiredAt: now }
+      });
+      return tx.evaluationCriteriaVersion.update({
+        where: { id },
+        data: { status: 'ACTIVE', activatedAt: now, retiredAt: null },
+        include: { criteria: { orderBy: { sortOrder: 'asc' } } }
+      });
+    }, { isolationLevel: 'Serializable' });
+    return serializeCriteriaVersion(activated);
+  } catch (error) {
+    if (error?.code === 'P2002' || error?.code === 'P2034') {
+      throw new AppError(409, 'CRITERIA_ACTIVATION_CONFLICT', 'The active criteria changed concurrently. Refresh and try again.');
+    }
+    throw error;
+  }
 }
 
 export async function getSettings() {
