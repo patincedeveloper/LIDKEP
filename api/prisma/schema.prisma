@@ -183,7 +183,7 @@ model UserProfile {
   displayName         String
   organization        String?
   identificationType  String?
-  identificationNumber String?
+  identificationNumber String?    @unique
   educationLevel      String?
   province            String?
   district            String?
@@ -193,7 +193,7 @@ model UserProfile {
   preferredLanguage   String     @default("en")
   publicProfile       Boolean    @default(false)
   privateContactEmail String?
-  privatePhone        String?
+  privatePhone        String?     @unique
   contactPreference   String?
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt

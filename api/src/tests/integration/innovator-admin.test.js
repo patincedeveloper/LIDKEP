@@ -510,6 +510,7 @@ afterAll(async () => {
     await tx.innovation.updateMany({ where: { id: { in: innovationIds } }, data: { publishedVersionId: null } });
     await tx.innovationVersion.deleteMany({ where: { id: { in: versionIds } } });
     await tx.innovation.deleteMany({ where: { id: { in: innovationIds } } });
+    await tx.userProfile.deleteMany({ where: { userId: { in: userIds } } });
     await tx.user.deleteMany({ where: { id: { in: userIds } } });
   });
   await Promise.all(evidenceStorageKeys.map((storageKey) => unlink(path.resolve(process.env.UPLOAD_DIR ?? 'api/uploads', storageKey)).catch(() => {})));

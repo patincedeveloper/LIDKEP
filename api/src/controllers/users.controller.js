@@ -4,6 +4,8 @@ import { usersRepository } from '../repositories/users.repository.js';
 import { serializeUser } from '../services/auth.service.js';
 import { addProfileEvidence, getProfileEvidenceDownload, serializeProfileEvidence, submitProfileForReview } from '../services/users.service.js';
 import { serializeNotification } from '../services/notification.service.js';
+import { assertProfileIdentifiersAvailable } from '../services/profile-identifiers.service.js';
+import { normalizeIdentificationNumber, normalizeRwandaPhone } from '../validators/common.validator.js';
 
 export async function profile(req, res) {
   const verification = await prisma.verificationRequest.findFirst({
@@ -29,17 +31,23 @@ export async function profile(req, res) {
 }
 
 export async function updateProfile(req, res) {
+  const identificationNumber = normalizeIdentificationNumber(
+    req.validated.body.identificationType,
+    req.validated.body.identificationNumber
+  );
+  const privatePhone = normalizeRwandaPhone(req.validated.body.phoneNumber);
   await prisma.$transaction(async (tx) => {
+    await assertProfileIdentifiersAvailable(
+      { identificationNumber, phoneNumber: privatePhone },
+      req.user.id,
+      tx
+    );
     await usersRepository.updateProfile(req.user.id, {
       displayName: req.validated.body.displayName,
       organization: req.validated.body.organization || null,
       identificationType: req.validated.body.identificationType,
-      identificationNumber: req.validated.body.identificationNumber,
-      privatePhone: req.validated.body.phoneNumber.startsWith('0')
-        ? `+250${req.validated.body.phoneNumber.slice(1)}`
-        : req.validated.body.phoneNumber.startsWith('+')
-          ? req.validated.body.phoneNumber
-          : `+${req.validated.body.phoneNumber}`,
+      identificationNumber,
+      privatePhone,
       educationLevel: req.validated.body.educationLevel,
       province: req.validated.body.province,
       district: req.validated.body.district,

@@ -105,6 +105,50 @@ describe('real platform identity and public API', () => {
     ]));
     expect((await agent.get(`/api/v1/users/profile/evidence/${uploaded.body.data.id}/download`)).status).toBe(200);
     expect((await agent.post('/api/v1/users/me/profile/submit').send({})).status).toBe(200);
+
+    const duplicateAgent = request.agent(app);
+    const duplicateEmail = `duplicate-identity-${randomUUID()}@example.rw`;
+    expect((await duplicateAgent.post('/api/v1/auth/register').send({
+      email: duplicateEmail,
+      password: 'ValidPassword@123',
+      displayName: 'Duplicate Check User',
+      role: 'EXPERT'
+    })).status).toBe(201);
+    createdEmails.push(duplicateEmail);
+    const duplicateBase = {
+      displayName: 'Duplicate Check User',
+      identificationType: 'OTHER_GOVERNMENT_ID',
+      educationLevel: "Bachelor's degree",
+      province: 'City of Kigali',
+      district: 'Gasabo',
+      administrativeSector: 'Kimironko',
+      occupation: 'Technical specialist',
+      yearsOfExperience: 2,
+      organization: '',
+      preferredLanguage: 'en',
+      publicProfile: false
+    };
+    const duplicateId = await duplicateAgent.put('/api/v1/users/me/profile').send({
+      ...duplicateBase,
+      identificationNumber: 'gov/abc-123',
+      phoneNumber: '0788123498'
+    });
+    expect(duplicateId.status).toBe(409);
+    expect(duplicateId.body.error.code).toBe('IDENTIFICATION_NUMBER_ALREADY_USED');
+    expect(duplicateId.body.error.fieldErrors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ field: 'identificationNumber' })
+    ]));
+
+    const duplicatePhone = await duplicateAgent.put('/api/v1/users/me/profile').send({
+      ...duplicateBase,
+      identificationNumber: 'GOV/UNIQUE-456',
+      phoneNumber: '+250788123499'
+    });
+    expect(duplicatePhone.status).toBe(409);
+    expect(duplicatePhone.body.error.code).toBe('PHONE_NUMBER_ALREADY_USED');
+    expect(duplicatePhone.body.error.fieldErrors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ field: 'phoneNumber' })
+    ]));
   });
 
   it('rejects invalid credentials without revealing whether an email exists', async () => {
@@ -125,6 +169,7 @@ afterAll(async () => {
     await tx.verificationRequest.deleteMany({ where: { userId: { in: ids } } });
     await tx.notification.deleteMany({ where: { OR: [{ userId: { in: ids } }, { entityId: { in: ids } }] } });
     await tx.session.deleteMany({ where: { userId: { in: ids } } });
+    await tx.userProfile.deleteMany({ where: { userId: { in: ids } } });
     await tx.user.deleteMany({ where: { email: { in: createdEmails } } });
   });
   await Promise.all(evidenceStorageKeys.map((storageKey) =>

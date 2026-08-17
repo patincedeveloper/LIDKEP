@@ -6,6 +6,8 @@ import { hashPassword, serializeUser } from './auth.service.js';
 import { createNotification } from './notification.service.js';
 import { createInnovationAsAdministrator, serializeWorkspaceInnovation } from './innovations.service.js';
 import { uploadDirectory } from '../middleware/upload.js';
+import { assertProfileIdentifiersAvailable } from './profile-identifiers.service.js';
+import { normalizeIdentificationNumber, normalizeRwandaPhone } from '../validators/common.validator.js';
 
 const innovationInclude = {
   owner: { include: { profile: true } },
@@ -57,8 +59,10 @@ function profileData(input) {
     displayName: input.displayName,
     organization: input.organization || null,
     identificationType: input.identificationType || null,
-    identificationNumber: input.identificationNumber || null,
-    privatePhone: input.phoneNumber || null,
+    identificationNumber: input.identificationNumber
+      ? normalizeIdentificationNumber(input.identificationType, input.identificationNumber)
+      : null,
+    privatePhone: input.phoneNumber ? normalizeRwandaPhone(input.phoneNumber) : null,
     educationLevel: input.educationLevel || null,
     province: input.province || null,
     district: input.district || null,
@@ -112,6 +116,13 @@ export async function createUser(admin, input, requestId) {
   if (!role?.isActive) throw new AppError(422, 'ROLE_UNAVAILABLE', 'The selected account type is unavailable.');
   const passwordHash = await hashPassword(input.password);
   const created = await prisma.$transaction(async (tx) => {
+    const profile = profileData(input);
+    if (profile.identificationNumber || profile.privatePhone) {
+      await assertProfileIdentifiersAvailable({
+        identificationNumber: profile.identificationNumber,
+        phoneNumber: profile.privatePhone
+      }, undefined, tx);
+    }
     const user = await tx.user.create({
       data: {
         email: input.email,
@@ -120,7 +131,7 @@ export async function createUser(admin, input, requestId) {
         status: input.status,
         emailVerifiedAt: new Date(),
         mustChangePassword: true,
-        profile: { create: profileData(input) }
+        profile: { create: profile }
       },
       include: userInclude
     });
@@ -144,13 +155,20 @@ export async function updateUser(admin, id, input, requestId) {
   const role = await prisma.role.findUnique({ where: { code: input.role } });
   if (!role?.isActive) throw new AppError(422, 'ROLE_UNAVAILABLE', 'The selected account type is unavailable.');
   const updated = await prisma.$transaction(async (tx) => {
+    const profile = profileData(input);
+    if (profile.identificationNumber || profile.privatePhone) {
+      await assertProfileIdentifiersAvailable({
+        identificationNumber: profile.identificationNumber,
+        phoneNumber: profile.privatePhone
+      }, id, tx);
+    }
     const user = await tx.user.update({
       where: { id },
       data: {
         email: input.email,
         roleId: role.id,
         status: input.status,
-        profile: { upsert: { create: profileData(input), update: profileData(input) } }
+        profile: { upsert: { create: profile, update: profile } }
       },
       include: userInclude
     });

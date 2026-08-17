@@ -25,6 +25,16 @@ export const rwandaPhoneSchema = z.string()
     'Use a valid Rwanda mobile number: 07 followed by 8 digits.'
   );
 
+export function normalizeIdentificationNumber(type, value) {
+  const normalized = value.trim();
+  return type === 'NATIONAL_ID' ? normalized : normalized.toUpperCase();
+}
+
+export function normalizeRwandaPhone(value) {
+  const digits = value.replace(/\D/g, '');
+  return digits.startsWith('0') ? `+250${digits.slice(1)}` : `+${digits}`;
+}
+
 export const countWords = (value) => value.trim().split(/\s+/).filter(Boolean).length;
 
 export const optionalNarrative = (maximumCharacters = 20000) => z.string()
