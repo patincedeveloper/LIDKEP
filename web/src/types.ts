@@ -1,4 +1,5 @@
-export type Role = 'SYSTEM_ADMINISTRATOR' | 'INNOVATOR' | 'EXPERT' | 'INVESTOR_PARTNER' | 'PUBLIC_USER';
+export type Role = 'SYSTEM_ADMINISTRATOR' | 'INNOVATOR' | 'EXPERT' | 'INVESTOR_PARTNER';
+
 export type Account = {
   id: string; name: string; email: string; role: Role; accountStatus: string; organization: string; district: string;
   verified: boolean; mfaEnabled: boolean; mustChangePassword: boolean; profileComplete: boolean; approvalStatus: string;

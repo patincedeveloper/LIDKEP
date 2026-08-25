@@ -24,7 +24,7 @@ describe('real platform identity and public API', () => {
     expect(response.body.error.code).toBe('ROUTE_NOT_FOUND');
   });
 
-  it('registers a real Innovator with a restricted profile-completion session', async () => {
+  it('registers a real Innovator with an immediate active session', async () => {
     const agent = request.agent(app);
     const email = `test-${randomUUID()}@example.rw`;
     const registered = await agent.post('/api/v1/auth/register').send({
@@ -36,16 +36,14 @@ describe('real platform identity and public API', () => {
     expect(registered.status).toBe(201);
     createdEmails.push(email);
     expect(registered.body.data.user.email).toBe(email);
-    expect(registered.body.data.requiresApproval).toBe(true);
+    expect(registered.body.data.requiresApproval).toBe(false);
 
     const me = await agent.get('/api/v1/auth/me');
     expect(me.status).toBe(200);
-    expect(me.body.data.user.approvalStatus).toBe('DRAFT');
-    expect(me.body.data.user.profileComplete).toBe(false);
-    const protectedAction = await agent.get('/api/v1/innovations');
-    expect(protectedAction.status).toBe(403);
-    expect(protectedAction.body.error.code).toBe('ACCOUNT_APPROVAL_REQUIRED');
+    expect(me.body.data.user.approvalStatus).toBe('APPROVED');
+    expect(me.body.data.user.accountStatus).toBe('ACTIVE');
   });
+
 
   it('rejects weak registration passwords', async () => {
     const response = await request(app).post('/api/v1/auth/register').send({

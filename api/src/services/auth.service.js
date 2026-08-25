@@ -66,7 +66,8 @@ export async function register(input, context) {
   if (existing) throw new AppError(409, 'EMAIL_ALREADY_REGISTERED', 'An account already exists for this email.');
   const role = await prisma.role.findUnique({ where: { code: input.role } });
   if (!role || !role.isActive) throw new AppError(422, 'ROLE_UNAVAILABLE', 'The selected account type is unavailable.');
-  const status = 'PENDING_APPROVAL';
+  const isInnovator = input.role === 'INNOVATOR';
+  const status = isInnovator ? 'ACTIVE' : 'PENDING_APPROVAL';
   const passwordHash = await hashPassword(input.password);
   return prisma.$transaction(async (tx) => {
     const user = await usersRepository.create({
@@ -82,11 +83,16 @@ export async function register(input, context) {
       }
     }, tx);
     await tx.verificationRequest.create({
-      data: { userId: user.id, requestedRole: input.role, status: 'DRAFT' }
+      data: {
+        userId: user.id,
+        requestedRole: input.role,
+        status: isInnovator ? 'APPROVED' : 'DRAFT',
+        ...(isInnovator ? { submittedAt: new Date(), decidedAt: new Date() } : {})
+      }
     });
     const token = await issueSession(user.id, context, tx);
     const hydrated = await usersRepository.findById(user.id, tx);
-    return { user: serializeUser(hydrated), token };
+    return { user: serializeUser(hydrated), token, requiresApproval: !isInnovator };
   });
 }
 

@@ -29,6 +29,11 @@ export const deleteInnovation = async (req, res) => {
 export const taxonomies = async (req, res) => res.json(successResponse(req, await adminService.listTaxonomies()));
 export const createTaxonomy = async (req, res) => res.status(201).json(successResponse(req, await adminService.createTaxonomy(req.user, req.validated.body, req.requestId)));
 export const updateTaxonomy = async (req, res) => res.json(successResponse(req, await adminService.updateTaxonomy(req.user, req.validated.params.id, req.validated.body, req.requestId)));
+export const deleteTaxonomy = async (req, res) => {
+  await adminService.deleteTaxonomy(req.user, req.validated.params.id, req.requestId);
+  res.json(successResponse(req, { deleted: true }));
+};
+
 export const criteria = async (req, res) => res.json(successResponse(req, await adminService.listCriteria()));
 export const createCriteria = async (req, res) => res.status(201).json(successResponse(req, await adminService.createCriteria(req.user, req.validated.body, req.requestId)));
 export const activateCriteria = async (req, res) => res.json(successResponse(req, await adminService.activateCriteria(req.user, req.validated.params.id, req.requestId)));

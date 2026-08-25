@@ -18,6 +18,7 @@ import {
   updateUserStatusSchema,
 } from "../validators/admin.validator.js";
 
+
 export const adminRouter = Router();
 adminRouter.use(authenticate, authorize("SYSTEM_ADMINISTRATOR"));
 
@@ -100,6 +101,12 @@ adminRouter.patch(
   validate(updateTaxonomySchema),
   controller.updateTaxonomy,
 );
+adminRouter.delete(
+  "/taxonomies/:id",
+  validate(adminIdSchema),
+  controller.deleteTaxonomy,
+);
+
 adminRouter.get("/criteria", validate(adminEmptySchema), controller.criteria);
 adminRouter.post(
   "/criteria",

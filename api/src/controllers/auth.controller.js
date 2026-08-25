@@ -20,8 +20,9 @@ const context = (req) => ({
 export async function register(req, res) {
   const result = await authService.register(req.validated.body, context(req));
   if (result.token) res.cookie(env.SESSION_COOKIE_NAME, result.token, cookieOptions);
-  res.status(201).json(successResponse(req, { user: result.user, requiresApproval: true }));
+  res.status(201).json(successResponse(req, { user: result.user, requiresApproval: result.requiresApproval }));
 }
+
 
 export async function login(req, res) {
   const result = await authService.login(req.validated.body, context(req));

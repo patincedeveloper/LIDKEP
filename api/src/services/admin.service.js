@@ -443,12 +443,38 @@ export async function createTaxonomy(admin, input, requestId) {
 }
 
 export async function updateTaxonomy(admin, id, input, requestId) {
-  const record = await prisma.$transaction(async (tx) => {
-    const updated = await tx.taxonomy.update({ where: { id }, data: { isActive: input.isActive } });
-    return updated;
-  });
+  const existing = await prisma.taxonomy.findUnique({ where: { id } });
+  if (!existing) throw new AppError(404, 'TAXONOMY_NOT_FOUND', 'The classification item was not found.');
+  const updateData = {};
+  if (typeof input.isActive === 'boolean') updateData.isActive = input.isActive;
+  if (input.label) {
+    updateData.label = input.label;
+    updateData.code = codeFor(input.label);
+  }
+  const record = await prisma.taxonomy.update({ where: { id }, data: updateData });
   return record;
 }
+
+export async function deleteTaxonomy(admin, id, requestId) {
+  const existing = await prisma.taxonomy.findUnique({ where: { id } });
+  if (!existing) throw new AppError(404, 'TAXONOMY_NOT_FOUND', 'The classification item was not found.');
+  // Prevent deletion if referenced by innovation versions
+  const labelValue = existing.label;
+  const field = existing.type === 'SECTOR' ? 'sector'
+    : existing.type === 'CATEGORY' ? 'category'
+    : existing.type === 'DISTRICT' ? 'district'
+    : existing.type === 'MATURITY_LEVEL' ? 'maturity'
+    : existing.type === 'IMPACT_AREA' ? 'impactArea'
+    : null;
+  if (field) {
+    const count = await prisma.innovationVersion.count({ where: { [field]: labelValue } });
+    if (count > 0) {
+      throw new AppError(409, 'TAXONOMY_IN_USE', `This classification item is used by ${count} innovation record(s) and cannot be deleted. Deactivate it instead.`);
+    }
+  }
+  await prisma.taxonomy.delete({ where: { id } });
+}
+
 
 export async function listCriteria() {
   const records = await prisma.evaluationCriteriaVersion.findMany({ include: { criteria: { orderBy: { sortOrder: 'asc' } } }, orderBy: { createdAt: 'desc' } });

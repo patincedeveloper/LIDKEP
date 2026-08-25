@@ -150,7 +150,6 @@ const roleWorkspace: Record<Role, string> = {
   INNOVATOR: "innovator",
   EXPERT: "expert",
   INVESTOR_PARTNER: "partner",
-  PUBLIC_USER: "public",
 };
 const workspaceRole: Record<string, Role> = {
   admin: "SYSTEM_ADMINISTRATOR",
@@ -158,6 +157,7 @@ const workspaceRole: Record<string, Role> = {
   expert: "EXPERT",
   partner: "INVESTOR_PARTNER",
 };
+
 const navigation: Record<
   "admin" | "innovator" | "expert" | "partner",
   NavigationItem[]
@@ -233,13 +233,14 @@ export function WorkspacePage() {
     return (
       <Navigate
         to={
-          role === "PUBLIC_USER"
+          !role
             ? "/discover"
             : `/${roleWorkspace[role]}/dashboard`
         }
         replace
       />
     );
+
   if (
     user.accountStatus !== "ACTIVE" &&
     !["profile", "notifications"].includes(section)
@@ -341,10 +342,11 @@ export function WorkspacePage() {
 
 function PendingApprovalPage() {
   const { user } = usePlatform();
+  const role = user?.role ?? "INNOVATOR";
   return (
     <>
       <PageHeader
-        eyebrow={`${friendlyRole(user?.role ?? "PUBLIC_USER")} account`}
+        eyebrow={`${friendlyRole(role)} account`}
         title="Your profile is under review"
         description="Your information has been submitted to the System Administrator. You can use the workspace after approval."
       />
@@ -369,7 +371,7 @@ function PendingApprovalPage() {
               Browse public innovations
             </ButtonLink>
             <ButtonLink
-              to={`/${roleWorkspace[user?.role ?? "PUBLIC_USER"]}/notifications`}
+              to={`/${roleWorkspace[role]}/notifications`}
             >
               View notifications
             </ButtonLink>
@@ -379,6 +381,7 @@ function PendingApprovalPage() {
     </>
   );
 }
+
 
 function InnovatorSection({ section, id }: { section: string; id?: string }) {
   if (section === "dashboard") return <InnovatorDashboard />;
@@ -458,6 +461,10 @@ function InnovatorDashboard() {
   const records = data?.innovations ?? [];
   const revisions = data?.revisions ?? [];
   const notifications = data?.notifications ?? [];
+  const engagements = data?.engagements ?? [];
+  const pendingCollaborations = engagements.filter((item) =>
+    ["PENDING", "CLARIFICATION_REQUESTED"].includes(item.status),
+  );
   const localDraft = readLocalInnovationDraft(user?.id);
   return (
     <>
@@ -504,6 +511,12 @@ function InnovatorDashboard() {
           icon={<ClipboardCheck />}
         />
         <StatCard
+          label="Collaboration requests"
+          value={pendingCollaborations.length}
+          detail="Pending partner requests"
+          icon={<Handshake />}
+        />
+        <StatCard
           label="Unread updates"
           value={notifications.filter((item) => !item.read).length}
           detail="Account notifications"
@@ -545,9 +558,37 @@ function InnovatorDashboard() {
           />
         )}
       </Panel>
+      {pendingCollaborations.length > 0 && (
+        <Panel>
+          <PanelHeader>
+            <div>
+              <h2>Pending collaboration requests</h2>
+              <p>Partner requests awaiting your response.</p>
+            </div>
+            <ButtonLink to="/innovator/collaborations" $variant="secondary">
+              View all
+            </ButtonLink>
+          </PanelHeader>
+          <RecordList>
+            {pendingCollaborations.slice(0, 5).map((item) => (
+              <Link key={item.id} to="/innovator/collaborations">
+                <span>
+                  <strong>{item.innovation}</strong>
+                  <small>
+                    {item.partner} · {item.type.replaceAll("_", " ")}
+                  </small>
+                </span>
+                <StatusBadge status={item.status} />
+                <ChevronRight />
+              </Link>
+            ))}
+          </RecordList>
+        </Panel>
+      )}
     </>
   );
 }
+
 
 function ExpertDashboard() {
   const { data } = usePlatform();
@@ -3342,6 +3383,7 @@ function VerificationsPage({ selectedId }: { selectedId?: string }) {
   const [items, setItems] = useState<Verification[]>([]);
   const [selected, setSelected] = useState<Verification | null>(null);
   const [error, setError] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const load = () =>
     request<Verification[]>("/api/v1/admin/verifications")
       .then(setItems)
@@ -3362,6 +3404,11 @@ function VerificationsPage({ selectedId }: { selectedId?: string }) {
     item: Verification;
     decision: "APPROVE" | "REJECT";
   } | null>(null);
+  const filteredItems = useMemo(
+    () => statusFilter === "ALL" ? items : items.filter((item) => item.status === statusFilter),
+    [items, statusFilter],
+  );
+
   const decide = async () => {
     if (!pending) return;
     try {
@@ -3498,9 +3545,22 @@ function VerificationsPage({ selectedId }: { selectedId?: string }) {
         description="Every submitted Innovator, Expert, and Investor / Industry Partner profile requires a System Administrator decision before its role workspace is unlocked."
       />
       {error && <ErrorBox>{error}</ErrorBox>}
-      {items.length ? (
+      <FilterBar>
+        <Field label="Filter by status">
+          <Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="ALL">All statuses</option>
+            <option value="PENDING_APPROVAL">Pending approval</option>
+            <option value="APPROVED">Approved</option>
+            <option value="REJECTED">Rejected</option>
+          </Select>
+        </Field>
+      </FilterBar>
+      {filteredItems.length ? (
         <CardGrid>
-          {items.map((item) => (
+          {filteredItems.map((item) => (
             <Panel key={item.id}>
               <PanelBody>
                 <StatusBadge status={item.status} />
@@ -3526,7 +3586,7 @@ function VerificationsPage({ selectedId }: { selectedId?: string }) {
         </CardGrid>
       ) : (
         <EmptyState
-          title="No account approvals"
+          title={statusFilter === "ALL" ? "No account approvals" : `No ${statusFilter.replace("_", " ").toLowerCase()} accounts`}
           copy="New role registrations will appear here."
         />
       )}
@@ -3543,6 +3603,7 @@ function VerificationsPage({ selectedId }: { selectedId?: string }) {
     </>
   );
 }
+
 
 const canAssignExpert = (innovation: Innovation) =>
   !innovation.assignment &&
@@ -4343,6 +4404,9 @@ function TaxonomiesPage() {
   const [type, setType] = useState("SECTOR");
   const [label, setLabel] = useState("");
   const [error, setError] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<Taxonomy | null>(null);
   const load = () =>
     request<Taxonomy[]>("/api/v1/admin/taxonomies")
       .then(setItems)
@@ -4374,6 +4438,41 @@ function TaxonomiesPage() {
       setError(messageOf(cause));
     }
   };
+  const startEdit = (item: Taxonomy) => {
+    setEditingId(item.id);
+    setEditLabel(item.label);
+  };
+  const saveEdit = async (item: Taxonomy) => {
+    if (!editLabel.trim() || editLabel.trim() === item.label) {
+      setEditingId(null);
+      return;
+    }
+    try {
+      await request(`/api/v1/admin/taxonomies/${item.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ label: editLabel.trim() }),
+      });
+      setEditingId(null);
+      notify("Classification item renamed.");
+      load();
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
+  };
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    try {
+      await request(`/api/v1/admin/taxonomies/${pendingDelete.id}`, {
+        method: "DELETE",
+      });
+      setPendingDelete(null);
+      notify("Classification item deleted.");
+      load();
+    } catch (cause) {
+      setError(messageOf(cause));
+      setPendingDelete(null);
+    }
+  };
   const grouped = useMemo(
     () =>
       items.reduce<Record<string, Taxonomy[]>>((result, item) => {
@@ -4387,7 +4486,7 @@ function TaxonomiesPage() {
       <PageHeader
         eyebrow="Classification"
         title="Sectors and categories"
-        description="Manage the simple lists used by Innovators and public discovery."
+        description="Manage the simple lists used by Innovators and public discovery. Click a label to rename it. Use the toggle button to activate or deactivate."
       />
       {error && <ErrorBox>{error}</ErrorBox>}
       <Panel>
@@ -4424,23 +4523,74 @@ function TaxonomiesPage() {
             <PanelBody>
               <TagList>
                 {values?.map((item) => (
-                  <button
-                    key={item.id}
-                    className={item.isActive ? "" : "inactive"}
-                    onClick={() => toggle(item)}
-                  >
-                    {item.label}
-                    <small>{item.isActive ? "Active" : "Inactive"}</small>
-                  </button>
+                  <TaxonomyItem key={item.id} className={item.isActive ? "" : "inactive"}>
+                    {editingId === item.id ? (
+                      <TaxonomyEditRow>
+                        <Input
+                          value={editLabel}
+                          onChange={(e) => setEditLabel(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void saveEdit(item);
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                          autoFocus
+                        />
+                        <Button onClick={() => saveEdit(item)}>
+                          <Save size={14} />
+                        </Button>
+                        <Button $variant="secondary" onClick={() => setEditingId(null)}>
+                          <X size={14} />
+                        </Button>
+                      </TaxonomyEditRow>
+                    ) : (
+                      <TaxonomyItemRow>
+                        <button
+                          className="label-toggle"
+                          onClick={() => toggle(item)}
+                          title={item.isActive ? "Click to deactivate" : "Click to activate"}
+                        >
+                          {item.label}
+                          <small>{item.isActive ? "Active" : "Inactive"}</small>
+                        </button>
+                        <TaxonomyActions>
+                          <button
+                            className="icon-btn"
+                            title="Rename"
+                            onClick={() => startEdit(item)}
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            className="icon-btn danger"
+                            title="Delete"
+                            onClick={() => setPendingDelete(item)}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </TaxonomyActions>
+                      </TaxonomyItemRow>
+                    )}
+                  </TaxonomyItem>
                 ))}
               </TagList>
             </PanelBody>
           </Panel>
         ))}
       </TaxonomyGrid>
+      {pendingDelete && (
+        <ConfirmationDialog
+          title={`Delete "${pendingDelete.label}"?`}
+          message="This item will be permanently removed. If it is used by any innovation record, deletion will be blocked — deactivate it instead."
+          confirmLabel="Delete"
+          danger
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={confirmDelete}
+        />
+      )}
     </>
   );
 }
+
 
 const standardCriterionNames = [
   "Problem relevance",
@@ -4748,31 +4898,128 @@ function CriteriaPage() {
   );
 }
 
+type ReportData = {
+  generatedAt: string;
+  usersByRole: Array<{ label: string; value: number }>;
+  usersByStatus: Array<{ label: string; value: number }>;
+  innovationsByStatus: Array<{ label: string; value: number }>;
+  publishedBySector: Array<{ label: string; value: number }>;
+};
+
 function ReportsPage() {
   const { request } = usePlatform();
-  const [report, setReport] = useState<Record<string, unknown> | null>(null);
+  const [report, setReport] = useState<ReportData | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
-    request<Record<string, unknown>>("/api/v1/admin/reports/summary")
+    request<ReportData>("/api/v1/admin/reports/summary")
       .then(setReport)
       .catch((cause) => setError(messageOf(cause)));
   }, []);
+  const printReport = () => window.print();
   return (
     <>
+      <style>{`@media print { .no-print { display: none !important; } body { font-family: sans-serif; } }`}</style>
       <PageHeader
         eyebrow="System reports"
         title="Prototype summary report"
-        description="Current database totals only. Advanced exports are intentionally outside this phase."
+        description="Current database totals. Use Print / Download PDF to save or share this report."
+        action={
+          <Button className="no-print" onClick={printReport}>
+            <Download />
+            Print / Download PDF
+          </Button>
+        }
       />
       {error && <ErrorBox>{error}</ErrorBox>}
       {report ? (
-        <ReportPre>{JSON.stringify(report, null, 2)}</ReportPre>
+        <>
+          <ReportMeta>Generated {formatDate(report.generatedAt)}</ReportMeta>
+          <ReportGrid>
+            <Panel>
+              <PanelHeader><h2>Users by role</h2></PanelHeader>
+              <PanelBody>
+                <ReportTable>
+                  <thead>
+                    <tr><th>Role</th><th>Count</th></tr>
+                  </thead>
+                  <tbody>
+                    {report.usersByRole.map((row) => (
+                      <tr key={row.label}>
+                        <td>{row.label?.replaceAll("_", " ") || "—"}</td>
+                        <td><strong>{row.value}</strong></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </ReportTable>
+              </PanelBody>
+            </Panel>
+            <Panel>
+              <PanelHeader><h2>Users by account status</h2></PanelHeader>
+              <PanelBody>
+                <ReportTable>
+                  <thead>
+                    <tr><th>Status</th><th>Count</th></tr>
+                  </thead>
+                  <tbody>
+                    {report.usersByStatus.map((row) => (
+                      <tr key={row.label}>
+                        <td>{row.label?.replaceAll("_", " ") || "—"}</td>
+                        <td><strong>{row.value}</strong></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </ReportTable>
+              </PanelBody>
+            </Panel>
+            <Panel>
+              <PanelHeader><h2>Innovations by status</h2></PanelHeader>
+              <PanelBody>
+                <ReportTable>
+                  <thead>
+                    <tr><th>Status</th><th>Count</th></tr>
+                  </thead>
+                  <tbody>
+                    {report.innovationsByStatus.map((row) => (
+                      <tr key={row.label}>
+                        <td>{row.label?.replaceAll("_", " ") || "—"}</td>
+                        <td><strong>{row.value}</strong></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </ReportTable>
+              </PanelBody>
+            </Panel>
+            <Panel>
+              <PanelHeader><h2>Published innovations by sector</h2></PanelHeader>
+              <PanelBody>
+                {report.publishedBySector.length ? (
+                  <ReportTable>
+                    <thead>
+                      <tr><th>Sector</th><th>Count</th></tr>
+                    </thead>
+                    <tbody>
+                      {report.publishedBySector.map((row) => (
+                        <tr key={row.label}>
+                          <td>{row.label || "—"}</td>
+                          <td><strong>{row.value}</strong></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </ReportTable>
+                ) : (
+                  <p>No published innovations yet.</p>
+                )}
+              </PanelBody>
+            </Panel>
+          </ReportGrid>
+        </>
       ) : (
         <LoadingPanel />
       )}
     </>
   );
 }
+
 
 function SettingsPage() {
   const { request, notify } = usePlatform();
@@ -5083,7 +5330,8 @@ function ProfilePage() {
     try {
       await persistProfile();
       await refreshWorkspace();
-      notify(`${friendlyRole(user?.role ?? "PUBLIC_USER")} profile saved.`);
+      notify(`${friendlyRole(user?.role)} profile saved.`);
+
     } catch (cause) {
       const apiErrors = errorsFrom(cause);
       setFieldErrors(apiErrors);
@@ -5124,10 +5372,11 @@ function ProfilePage() {
   return (
     <>
       <PageHeader
-        eyebrow={`${friendlyRole(user?.role ?? "PUBLIC_USER")} account`}
-        title={`Complete your ${friendlyRole(user?.role ?? "PUBLIC_USER")} profile`}
+        eyebrow={`${friendlyRole(user?.role)} account`}
+        title={`Complete your ${friendlyRole(user?.role)} profile`}
         description="Provide the identity, contact, location, education, and professional information the System Administrator needs to review your account."
       />
+
       {user?.approvalStatus === "REJECTED" && (
         <ProfileNotice>
           <CircleAlert />
@@ -5423,8 +5672,9 @@ function ProfilePage() {
           <Setting>
             <span>
               <strong>
-                Show my {friendlyRole(user?.role ?? "PUBLIC_USER")} identity on
+                Show my {friendlyRole(user?.role)} identity on
                 published work
+
               </strong>
               <small>
                 Private identification and phone details are never public.
@@ -5465,7 +5715,7 @@ function ProfilePage() {
               <p>
                 Your information was submitted successfully. Please wait for the
                 System Administrator to approve your{" "}
-                {friendlyRole(user?.role ?? "PUBLIC_USER")} account.
+                {friendlyRole(user?.role)} account.
               </p>
               <Actions>
                 <Button
@@ -5583,14 +5833,14 @@ const messageOf = (cause: unknown) =>
   cause instanceof Error
     ? cause.message
     : "The request could not be completed.";
-const friendlyRole = (role: Role) =>
-  ({
+const friendlyRole = (role: Role | null | undefined): string =>
+  (!role ? "" : ({
     SYSTEM_ADMINISTRATOR: "System Administrator",
     INNOVATOR: "Innovator",
     EXPERT: "Expert",
     INVESTOR_PARTNER: "Investor / Industry Partner",
-    PUBLIC_USER: "Public User",
-  })[role];
+  })[role] ?? "");
+
 const initials = (name: string) =>
   name
     .split(" ")
@@ -6716,6 +6966,14 @@ const InlineForm = styled.div`
     grid-template-columns: 1fr;
   }
 `;
+const FilterBar = styled.div`
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  align-items: flex-end;
+`;
+
 const TaxonomyGrid = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -6749,6 +7007,54 @@ const TagList = styled.div`
     font-weight: 500;
   }
 `;
+const TaxonomyItem = styled.div`
+  border: 1px solid ${palette.line};
+  border-radius: 8px;
+  background: ${palette.soft};
+  &.inactive { opacity: 0.55; background: white; }
+`;
+const TaxonomyItemRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  .label-toggle {
+    flex: 1;
+    padding: 7px 9px;
+    text-align: left;
+    font-weight: 700;
+    color: ${palette.green};
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    small { font-size: 9px; font-weight: 500; }
+  }
+`;
+const TaxonomyActions = styled.div`
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  .icon-btn {
+    padding: 5px;
+    border: none;
+    background: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: ${palette.muted};
+    &:hover { background: ${palette.line}; color: ${palette.ink}; }
+    &.danger:hover { color: #c0392b; }
+  }
+`;
+const TaxonomyEditRow = styled.div`
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px;
+  input { flex: 1; }
+`;
+
 const CriteriaBuilder = styled.div`
   display: grid;
   gap: 12px;
@@ -6866,6 +7172,42 @@ const ReportPre = styled.pre`
   overflow: auto;
   font-size: 13px;
 `;
+const ReportGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  @media (max-width: 860px) {
+    grid-template-columns: 1fr;
+  }
+`;
+const ReportMeta = styled.p`
+  color: ${palette.muted};
+  font-size: 13px;
+  margin-bottom: 12px;
+`;
+const ReportTable = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  th {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 2px solid ${palette.line};
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: ${palette.muted};
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid ${palette.line};
+  }
+  tr:last-child td {
+    border-bottom: none;
+  }
+`;
+
+
 const SettingsGrid = styled.div`
   display: grid;
   grid-template-columns: minmax(0, 720px);

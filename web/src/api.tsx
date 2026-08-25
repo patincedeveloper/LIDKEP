@@ -35,7 +35,7 @@ export class ApiRequestError extends Error {
 type PlatformContextValue = {
   data: PlatformData | null;
   user: Account | null;
-  role: Role;
+  role: Role | null;
   loading: boolean;
   error: string;
   toast: string;
@@ -52,6 +52,7 @@ type PlatformContextValue = {
   refreshWorkspace: () => Promise<void>;
   request: <T = unknown>(path: string, options?: RequestInit) => Promise<T>;
 };
+
 
 const PlatformContext = createContext<PlatformContextValue | null>(null);
 
@@ -189,7 +190,8 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     () => ({
       data,
       user,
-      role: user?.role ?? "PUBLIC_USER",
+      role: user?.role ?? null,
+
       loading,
       error,
       toast,

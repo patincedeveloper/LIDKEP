@@ -43,9 +43,9 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
       role: 'INNOVATOR'
     });
     expect(registration.status).toBe(201);
-    expect(registration.body.data.requiresApproval).toBe(true);
+    expect(registration.body.data.requiresApproval).toBe(false);
     let verification = await prisma.verificationRequest.findFirst({ where: { user: { email: innovatorEmail } } });
-    expect(verification.status).toBe('DRAFT');
+    expect(verification.status).toBe('APPROVED');
 
     const profile = await innovator.put('/api/v1/users/me/profile').send({
       displayName: 'Phase One Innovator',
@@ -65,12 +65,6 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
     expect(profile.status).toBe(200);
     expect(profile.body.data.profileComplete).toBe(true);
     innovatorUserId = profile.body.data.id;
-    const submittedProfile = await innovator.post('/api/v1/users/me/profile/submit').send({});
-    expect(submittedProfile.status).toBe(200);
-    expect(submittedProfile.body.data.approvalStatus).toBe('PENDING_APPROVAL');
-    verification = await prisma.verificationRequest.findFirst({ where: { user: { email: innovatorEmail } } });
-    innovatorVerificationId = verification.id;
-    expect(verification.status).toBe('PENDING_APPROVAL');
 
     const adminLogin = await administrator.post('/api/v1/auth/login').send({
       email: process.env.INITIAL_ADMIN_EMAIL,
@@ -78,17 +72,8 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
     });
     expect(adminLogin.status).toBe(200);
     expect(adminLogin.body.data.user.mustChangePassword).toBe(false);
-    const prematureApproval = await administrator.post(`/api/v1/admin/verifications/${innovatorVerificationId}/decision`).send({ decision: 'APPROVE' });
-    expect(prematureApproval.status).toBe(409);
-    expect(prematureApproval.body.error.code).toBe('VERIFICATION_REVIEW_REQUIRED');
-    const reviewedApplication = await administrator.get(`/api/v1/admin/verifications/${innovatorVerificationId}`);
-    expect(reviewedApplication.status).toBe(200);
-    expect(reviewedApplication.body.data.email).toBe(innovatorEmail);
-    const approval = await administrator.post(`/api/v1/admin/verifications/${innovatorVerificationId}/decision`).send({
-      decision: 'APPROVE'
-    });
-    expect(approval.status).toBe(200);
     expect((await innovator.get('/api/v1/auth/me')).body.data.user.accountStatus).toBe('ACTIVE');
+
 
     const draft = await innovator.post('/api/v1/innovations').send({
       title: 'Phase One Water Monitor',
@@ -467,7 +452,40 @@ describe.sequential('Innovator and System Administrator prototype lifecycle', ()
     expect(await prisma.innovation.findUnique({ where: { id: managedInnovationId } })).toBeNull();
     expect(await prisma.innovationVersion.findUnique({ where: { id: createdInnovation.body.data.versionId } })).toBeNull();
   });
+
+  it('allows the System Administrator to perform full CRUD on taxonomies and view reports', async () => {
+    // 1. Create taxonomy item
+    const createdTaxonomy = await administrator.post('/api/v1/admin/taxonomies').send({
+      type: 'SECTOR',
+      label: `Test Sector ${suffix.slice(0, 6)}`
+    });
+    expect(createdTaxonomy.status).toBe(201);
+    expect(createdTaxonomy.body.data.label).toBe(`Test Sector ${suffix.slice(0, 6)}`);
+    const taxonomyId = createdTaxonomy.body.data.id;
+
+    // 2. Update taxonomy label and active status
+    const updatedTaxonomy = await administrator.patch(`/api/v1/admin/taxonomies/${taxonomyId}`).send({
+      label: `Renamed Sector ${suffix.slice(0, 6)}`,
+      isActive: false
+    });
+    expect(updatedTaxonomy.status).toBe(200);
+    expect(updatedTaxonomy.body.data.label).toBe(`Renamed Sector ${suffix.slice(0, 6)}`);
+    expect(updatedTaxonomy.body.data.isActive).toBe(false);
+
+    // 3. Delete taxonomy item
+    const deletedTaxonomy = await administrator.delete(`/api/v1/admin/taxonomies/${taxonomyId}`);
+    expect(deletedTaxonomy.status).toBe(200);
+    expect(deletedTaxonomy.body.data.deleted).toBe(true);
+    expect(await prisma.taxonomy.findUnique({ where: { id: taxonomyId } })).toBeNull();
+
+    // 4. Reports summary
+    const reportResponse = await administrator.get('/api/v1/admin/reports/summary');
+    expect(reportResponse.status).toBe(200);
+    expect(reportResponse.body.data.usersByRole).toBeInstanceOf(Array);
+    expect(reportResponse.body.data.innovationsByStatus).toBeInstanceOf(Array);
+  });
 });
+
 
 afterAll(async () => {
   await prisma.$transaction(async (tx) => {

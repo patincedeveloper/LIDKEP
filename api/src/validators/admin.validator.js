@@ -120,8 +120,14 @@ export const createTaxonomySchema = request({
 
 export const updateTaxonomySchema = request({
   params: idParams,
-  body: z.object({ isActive: z.boolean() }).strict()
+  body: z.object({
+    isActive: z.boolean().optional(),
+    label: z.string().trim().min(2).max(120).optional()
+  }).strict().refine((value) => value.isActive !== undefined || value.label !== undefined, {
+    message: 'Provide isActive or label to update.'
+  })
 });
+
 
 const criterion = z.object({
   name: z.string().trim().min(2).max(160),
