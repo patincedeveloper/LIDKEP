@@ -6,13 +6,16 @@ import {
   CircleAlert,
   Clock3,
   ExternalLink,
+  Eye,
+  EyeOff,
   Leaf,
   LoaderCircle,
   Search,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { cloneElement, isValidElement, useId } from "react";
+import { cloneElement, isValidElement, useId, useState } from "react";
 import { palette } from "./styles";
+
 
 export const Brand = ({ compact = false }: { compact?: boolean }) => (
   <BrandLink to="/">
@@ -476,6 +479,88 @@ export const Input = styled.input`
   }
   ${invalidStyle}
 `;
+
+export const PasswordInput = ({
+  id,
+  name,
+  required,
+  minLength,
+  maxLength,
+  placeholder,
+  autoComplete,
+  defaultValue,
+  value,
+  onChange,
+  disabled,
+  "aria-invalid": ariaInvalid,
+  "aria-describedby": ariaDescribedby,
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement>) => {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <PasswordWrap>
+      <Input
+        {...props}
+        id={id}
+        name={name}
+        type={visible ? "text" : "password"}
+        required={required}
+        minLength={minLength}
+        maxLength={maxLength}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        defaultValue={defaultValue}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedby}
+        style={{ paddingRight: "42px" }}
+      />
+      <PasswordToggle
+        type="button"
+        tabIndex={-1}
+        onClick={() => setVisible((prev) => !prev)}
+        aria-label={visible ? "Hide password" : "Show password"}
+        title={visible ? "Hide password" : "Show password"}
+      >
+        {visible ? <EyeOff size={18} /> : <Eye size={18} />}
+      </PasswordToggle>
+    </PasswordWrap>
+  );
+};
+
+const PasswordWrap = styled.div`
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+`;
+
+const PasswordToggle = styled.button`
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${palette.muted};
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 0.15s ease;
+  &:hover {
+    color: ${palette.ink};
+  }
+  &:focus-visible {
+    outline: 2px solid ${palette.green};
+  }
+`;
+
 export const Select = styled.select`
   width: 100%;
   min-height: 44px;

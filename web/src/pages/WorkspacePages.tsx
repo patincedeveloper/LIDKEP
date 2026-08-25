@@ -72,6 +72,7 @@ import {
   Panel,
   PanelBody,
   PanelHeader,
+  PasswordInput,
   Select,
   StatCard,
   StatGrid,
@@ -80,6 +81,7 @@ import {
   TableWrap,
   Textarea,
 } from "../ui";
+
 
 type NavigationItem = { label: string; section: string; icon: React.ReactNode };
 type AdminDashboard = {
@@ -3289,14 +3291,14 @@ function UserEditor({
               </Field>
               {!user && (
                 <Field label="Temporary password">
-                  <Input
+                  <PasswordInput
                     name="password"
-                    type="password"
                     minLength={12}
                     required
                   />
                 </Field>
               )}
+
               <Field label="Organization">
                 <Input name="organization" defaultValue={user?.organization} />
               </Field>

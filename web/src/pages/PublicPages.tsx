@@ -38,10 +38,7 @@ const roleWorkspace: Record<Role, string> = {
   INVESTOR_PARTNER: "partner",
 };
 
-import {
-  fullNameIsValid,
-  projectCoverageLevels,
-} from "../validation";
+import { fullNameIsValid, projectCoverageLevels } from "../validation";
 import {
   Brand,
   Button,
@@ -55,6 +52,7 @@ import {
   Panel,
   PanelBody,
   PanelHeader,
+  PasswordInput,
   Select,
   StatCard,
   StatGrid,
@@ -109,7 +107,6 @@ export function PublicHeader() {
   );
 }
 
-
 export function HomePage() {
   const { user } = usePlatform();
 
@@ -123,21 +120,33 @@ export function HomePage() {
             <HeroContent>
               <HeroBadge>
                 <Sparkles size={14} />
-                <span>Rwanda Innovation Platform · Verified Local Discovery</span>
+                <span>
+                  Rwanda Innovation Platform · Verified Local Discovery
+                </span>
               </HeroBadge>
               <h1>
                 Local ideas. <em>Verified</em> solutions. Lasting impact.
               </h1>
               <p>
-                A trusted national platform connecting Rwandan innovators, domain experts, administrators, and investors to discover, evaluate, and scale grassroots ingenuity across every sector.
+                A trusted national platform connecting Rwandan innovators,
+                domain experts, administrators, and investors to discover,
+                evaluate, and scale grassroots ingenuity across every sector.
               </p>
               <HeroActions>
                 <ButtonLink
-                  to={user ? `/${roleWorkspace[user.role]}/dashboard` : "/register"}
+                  to={
+                    user
+                      ? `/${roleWorkspace[user.role]}/dashboard`
+                      : "/register"
+                  }
                 >
-                  {user ? "Go to Workspace" : "Submit Innovation"} <ArrowRight size={17} />
+                  {user ? "Go to Workspace" : "Submit Innovation"}{" "}
+                  <ArrowRight size={17} />
                 </ButtonLink>
-                <ButtonLink to={user ? "/discover" : "/about"} $variant="secondary">
+                <ButtonLink
+                  to={user ? "/discover" : "/about"}
+                  $variant="secondary"
+                >
                   {user ? "Explore Registry" : "How It Works"}
                 </ButtonLink>
               </HeroActions>
@@ -154,14 +163,19 @@ export function HomePage() {
             </HeroContent>
 
             <HeroVisualCard>
-              <HeroVisualImage src="/hero-green.jpg" alt="Rwanda innovation and sustainable development landscape" />
+              <HeroVisualImage
+                src="/hero-green.jpg"
+                alt="Rwanda innovation and sustainable development landscape"
+              />
               <HeroFloatingTag>
                 <HeroFloatingIcon>
                   <Sparkles size={20} />
                 </HeroFloatingIcon>
                 <div>
                   <strong>LIDKEP Innovation Hub</strong>
-                  <small>Kigali, Rwanda · Verified National Knowledge Exchange</small>
+                  <small>
+                    Kigali, Rwanda · Verified National Knowledge Exchange
+                  </small>
                 </div>
               </HeroFloatingTag>
             </HeroVisualCard>
@@ -174,7 +188,8 @@ export function HomePage() {
             <Eyebrow>How LIDKEP Works</Eyebrow>
             <h2>A complete path from idea to verified scale</h2>
             <p>
-              Structured workflows keep innovation ownership, expert evaluation, administrator publication, and partner collaboration transparent.
+              Structured workflows keep innovation ownership, expert evaluation,
+              administrator publication, and partner collaboration transparent.
             </p>
           </ServiceSectionHeader>
 
@@ -185,7 +200,9 @@ export function HomePage() {
               </ServiceIconWrap>
               <h3>Innovation Documentation</h3>
               <p>
-                Innovators capture local challenges, novel technical solutions, ownership declarations, and milestone evidence in structured, versioned drafts.
+                Innovators capture local challenges, novel technical solutions,
+                ownership declarations, and milestone evidence in structured,
+                versioned drafts.
               </p>
               <ServiceLink to="/about">
                 Read more <ArrowRight size={14} />
@@ -198,7 +215,9 @@ export function HomePage() {
               </ServiceIconWrap>
               <h3>Expert Technical Review</h3>
               <p>
-                Assigned domain specialists evaluate submissions against standardized criteria with transparent scoring, feedback notes, and revision guidance.
+                Assigned domain specialists evaluate submissions against
+                standardized criteria with transparent scoring, feedback notes,
+                and revision guidance.
               </p>
               <ServiceLink to="/about">
                 Read more <ArrowRight size={14} />
@@ -211,7 +230,8 @@ export function HomePage() {
               </ServiceIconWrap>
               <h3>Multi-Sector Classification</h3>
               <p>
-                Standardized categorization across Agriculture, Health, Renewable Energy, Water, ICT, Forestry, and Waste Management.
+                Standardized categorization across Agriculture, Health,
+                Renewable Energy, Water, ICT, Forestry, and Waste Management.
               </p>
               <ServiceLink to="/about">
                 Read more <ArrowRight size={14} />
@@ -224,7 +244,9 @@ export function HomePage() {
               </ServiceIconWrap>
               <h3>Partner & Investor Match</h3>
               <p>
-                Verified institutional investors and industry partners discover validated projects and initiate transparent, non-binding collaborations.
+                Verified institutional investors and industry partners discover
+                validated projects and initiate transparent, non-binding
+                collaborations.
               </p>
               <ServiceLink to="/about">
                 Read more <ArrowRight size={14} />
@@ -242,28 +264,42 @@ export function HomePage() {
                 Empowering Rwanda's grassroots <em>innovators</em>.
               </h2>
               <p>
-                Rwanda's socio-economic transformation is driven by local ingenuity. LIDKEP serves as the central bridge between grassroots inventors, technical specialists, and institutional supporters—ensuring promising local solutions are evidenced, objectively scored, and protected with immutable version history.
+                Rwanda's socio-economic transformation is driven by local
+                ingenuity. LIDKEP serves as the central bridge between
+                grassroots inventors, technical specialists, and institutional
+                supporters—ensuring promising local solutions are evidenced,
+                objectively scored, and protected with immutable version
+                history.
               </p>
               <MissionPoints>
                 <MissionPoint>
                   <CheckCircle2 size={20} />
                   <div>
                     <strong>Immediate Innovator Access</strong>
-                    <p>Innovators create accounts and start drafting immediately without administrative waiting barriers.</p>
+                    <p>
+                      Innovators create accounts and start drafting immediately
+                      without administrative waiting barriers.
+                    </p>
                   </div>
                 </MissionPoint>
                 <MissionPoint>
                   <CheckCircle2 size={20} />
                   <div>
                     <strong>Objective Multi-Criteria Scoring</strong>
-                    <p>Qualified experts assess problem relevance, solution quality, feasibility, impact potential, and evidence.</p>
+                    <p>
+                      Qualified experts assess problem relevance, solution
+                      quality, feasibility, impact potential, and evidence.
+                    </p>
                   </div>
                 </MissionPoint>
                 <MissionPoint>
                   <CheckCircle2 size={20} />
                   <div>
                     <strong>Consent-Controlled Partner Engagements</strong>
-                    <p>Collaborations and funding inquiries are transparently managed with full innovator consent on contact reveals.</p>
+                    <p>
+                      Collaborations and funding inquiries are transparently
+                      managed with full innovator consent on contact reveals.
+                    </p>
                   </div>
                 </MissionPoint>
               </MissionPoints>
@@ -273,7 +309,10 @@ export function HomePage() {
             </AboutMissionCopy>
 
             <AboutMissionVisual>
-              <img src="/eco-globe.jpg" alt="Sustainable innovation and knowledge exchange" />
+              <img
+                src="/eco-globe.jpg"
+                alt="Sustainable innovation and knowledge exchange"
+              />
             </AboutMissionVisual>
           </AboutMissionContainer>
         </AboutMissionSection>
@@ -312,7 +351,10 @@ export function HomePage() {
             <div>
               <Eyebrow>From the Registry</Eyebrow>
               <h2>Featured innovations worth knowing about</h2>
-              <p>Real, evaluated solutions developed by local Rwandan innovators to solve authentic challenges.</p>
+              <p>
+                Real, evaluated solutions developed by local Rwandan innovators
+                to solve authentic challenges.
+              </p>
             </div>
             {user ? (
               <ButtonLink to="/discover" $variant="secondary">
@@ -328,14 +370,23 @@ export function HomePage() {
           <ShowcaseGrid>
             <ShowcaseCard>
               <ShowcaseImageWrap>
-                <img src="/agri-solar.jpg" alt="Solar-powered terraced irrigation" />
+                <img
+                  src="/agri-solar.jpg"
+                  alt="Solar-powered terraced irrigation"
+                />
                 <ShowcaseTag>Agriculture & Food Security</ShowcaseTag>
               </ShowcaseImageWrap>
               <ShowcaseBody>
                 <h3>Solar-Powered Terraced Drip Irrigation</h3>
-                <p>Automated solar pumping and micro-irrigation system delivering water efficiently to terraced hillside farming cooperatives in Musanze.</p>
+                <p>
+                  Automated solar pumping and micro-irrigation system delivering
+                  water efficiently to terraced hillside farming cooperatives in
+                  Musanze.
+                </p>
                 <ShowcaseFoot>
-                  <span><MapPin size={13} /> Northern Province</span>
+                  <span>
+                    <MapPin size={13} /> Northern Province
+                  </span>
                   <small>Status: Verified & Published</small>
                 </ShowcaseFoot>
               </ShowcaseBody>
@@ -343,14 +394,23 @@ export function HomePage() {
 
             <ShowcaseCard>
               <ShowcaseImageWrap>
-                <img src="/community-solar.jpg" alt="Community solar microgrid" />
+                <img
+                  src="/community-solar.jpg"
+                  alt="Community solar microgrid"
+                />
                 <ShowcaseTag>Renewable Energy & Power</ShowcaseTag>
               </ShowcaseImageWrap>
               <ShowcaseBody>
                 <h3>Community Solar Microgrid & Storage</h3>
-                <p>Decentralized solar mini-grid with smart metering supplying clean, reliable energy to rural households and processing centers.</p>
+                <p>
+                  Decentralized solar mini-grid with smart metering supplying
+                  clean, reliable energy to rural households and processing
+                  centers.
+                </p>
                 <ShowcaseFoot>
-                  <span><MapPin size={13} /> Eastern Province</span>
+                  <span>
+                    <MapPin size={13} /> Eastern Province
+                  </span>
                   <small>Status: Verified & Published</small>
                 </ShowcaseFoot>
               </ShowcaseBody>
@@ -359,9 +419,13 @@ export function HomePage() {
             <ShowcaseCallout>
               <Eyebrow>Registry Access</Eyebrow>
               <h3>Explore all verified Rwandan innovations</h3>
-              <p>Sign in to browse complete technical briefs, evaluate evidence documents, and initiate partner collaborations.</p>
+              <p>
+                Sign in to browse complete technical briefs, evaluate evidence
+                documents, and initiate partner collaborations.
+              </p>
               <ButtonLink to={user ? "/discover" : "/register"}>
-                {user ? "Browse Directory" : "Join the Registry"} <ArrowRight size={16} />
+                {user ? "Browse Directory" : "Join the Registry"}{" "}
+                <ArrowRight size={16} />
               </ButtonLink>
             </ShowcaseCallout>
           </ShowcaseGrid>
@@ -372,28 +436,43 @@ export function HomePage() {
           <RoleSectionHeader>
             <Eyebrow>Ecosystem Architecture</Eyebrow>
             <h2>Built for every participant in the innovation ecosystem</h2>
-            <p>Clear roles and structured permissions protect intellectual contribution while accelerating scale.</p>
+            <p>
+              Clear roles and structured permissions protect intellectual
+              contribution while accelerating scale.
+            </p>
           </RoleSectionHeader>
           <RoleGrid>
             <RoleCard>
               <span>01</span>
               <h3>Innovators</h3>
-              <p>Immediate access to document solutions, upload evidence, declare ownership, respond to feedback, and manage partner requests.</p>
+              <p>
+                Immediate access to document solutions, upload evidence, declare
+                ownership, respond to feedback, and manage partner requests.
+              </p>
             </RoleCard>
             <RoleCard>
               <span>02</span>
               <h3>Technical Experts</h3>
-              <p>Review assigned submissions, score against versioned criteria sets, and recommend approval or structured technical revisions.</p>
+              <p>
+                Review assigned submissions, score against versioned criteria
+                sets, and recommend approval or structured technical revisions.
+              </p>
             </RoleCard>
             <RoleCard>
               <span>03</span>
               <h3>Investors & Partners</h3>
-              <p>Discover vetted solutions, submit formal non-binding collaboration terms, and receive consented direct contacts.</p>
+              <p>
+                Discover vetted solutions, submit formal non-binding
+                collaboration terms, and receive consented direct contacts.
+              </p>
             </RoleCard>
             <RoleCard>
               <span>04</span>
               <h3>System Administrators</h3>
-              <p>Oversee taxonomy, assign domain specialists, publish verified records, manage criteria versions, and export reports.</p>
+              <p>
+                Oversee taxonomy, assign domain specialists, publish verified
+                records, manage criteria versions, and export reports.
+              </p>
             </RoleCard>
           </RoleGrid>
         </RoleSection>
@@ -402,10 +481,19 @@ export function HomePage() {
         <CtaBanner>
           <CtaInner>
             <h2>Have an innovation that solves a local challenge?</h2>
-            <p>Join Rwanda's Local Innovation Discovery and Knowledge Exchange Platform to document your work, receive expert feedback, and connect with partners.</p>
+            <p>
+              Join Rwanda's Local Innovation Discovery and Knowledge Exchange
+              Platform to document your work, receive expert feedback, and
+              connect with partners.
+            </p>
             <CtaActions>
-              <ButtonLink to={user ? `/${roleWorkspace[user.role]}/dashboard` : "/register"}>
-                {user ? "Go to Workspace" : "Register as an Innovator"} <ArrowRight size={16} />
+              <ButtonLink
+                to={
+                  user ? `/${roleWorkspace[user.role]}/dashboard` : "/register"
+                }
+              >
+                {user ? "Go to Workspace" : "Register as an Innovator"}{" "}
+                <ArrowRight size={16} />
               </ButtonLink>
               {!user && (
                 <ButtonLink to="/login" $variant="secondary">
@@ -420,8 +508,6 @@ export function HomePage() {
     </HomeRoot>
   );
 }
-
-
 
 export function InnovationCard({
   item,
@@ -501,7 +587,7 @@ export function DirectoryPage() {
       <PageSurface>
         <PageHeader
           eyebrow="Verified registry"
-          title="Discover local green innovations"
+          title="Discover local  innovations"
           description="Search approved, published innovation knowledge. Restricted fields and private files are protected by verified role permissions."
         />
         <FilterPanel>
@@ -615,9 +701,7 @@ export function InnovationDetailPage() {
           <HeroFooter>
             <DetailActions>
               <Button
-                onClick={() =>
-                  notify("Innovation saved to your opportunities")
-                }
+                onClick={() => notify("Innovation saved to your opportunities")}
               >
                 <Bookmark size={17} /> Save opportunity
               </Button>
@@ -756,7 +840,12 @@ export function InnovationDetailPage() {
               {item.supportingLinks.length || item.evidence.length ? (
                 <ResourceList>
                   {item.supportingLinks.map((link) => (
-                    <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
+                    <a
+                      key={link.url}
+                      href={link.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       <FileText size={18} />
                       <span>
                         <strong>{link.title}</strong>
@@ -871,7 +960,6 @@ export function InnovationDetailPage() {
   );
 }
 
-
 export function AuthPage({ mode }: { mode: "login" | "register" | "reset" }) {
   const navigate = useNavigate();
   const { notify, login, register } = usePlatform();
@@ -962,7 +1050,6 @@ export function AuthPage({ mode }: { mode: "login" | "register" | "reset" }) {
               : mode === "register"
                 ? "Register as an Innovator, Expert, or Investor / Industry Partner. Innovators can access their workspace immediately. Expert and Partner accounts require System Administrator approval."
                 : "Enter your verified email to request recovery."}
-
           </p>
           <AuthTrust>
             <ShieldCheck />
@@ -1055,9 +1142,8 @@ export function AuthPage({ mode }: { mode: "login" | "register" | "reset" }) {
               </Field>
               {mode !== "reset" && (
                 <Field label="Password">
-                  <Input
+                  <PasswordInput
                     name="password"
-                    type="password"
                     required
                     minLength={12}
                     placeholder="At least 12 characters"
@@ -1169,26 +1255,23 @@ export function ChangePasswordPage() {
           <PanelBody>
             <AuthForm onSubmit={submit}>
               <Field label="Current password">
-                <Input
+                <PasswordInput
                   name="currentPassword"
-                  type="password"
                   required
                   autoComplete="current-password"
                 />
               </Field>
               <Field label="New password">
-                <Input
+                <PasswordInput
                   name="newPassword"
-                  type="password"
                   required
                   minLength={12}
                   autoComplete="new-password"
                 />
               </Field>
               <Field label="Confirm new password">
-                <Input
+                <PasswordInput
                   name="confirmPassword"
-                  type="password"
                   required
                   minLength={12}
                   autoComplete="new-password"
@@ -1225,7 +1308,8 @@ export function AboutPage() {
           <Eyebrow>5-Stage Lifecycle</Eyebrow>
           <h2>From local challenge to verified national scale</h2>
           <p>
-            Every innovation follows a transparent journey designed to protect intellectual ownership while verifying technical credibility.
+            Every innovation follows a transparent journey designed to protect
+            intellectual ownership while verifying technical credibility.
           </p>
         </AboutSectionTitle>
 
@@ -1238,12 +1322,32 @@ export function AboutPage() {
                 <h3>Draft & Document (Innovator)</h3>
               </ProcessStepHeader>
               <p>
-                Innovators self-register with instant active access and document their project. They capture the local challenge, technical solution, beneficiaries, novelty, scalability, sustainability, and milestones.
+                Innovators self-register with instant active access and document
+                their project. They capture the local challenge, technical
+                solution, beneficiaries, novelty, scalability, sustainability,
+                and milestones.
               </p>
               <ProcessPoints>
-                <div><CheckCircle2 size={15} /><span>Granular file visibility (Review-team, Public, or Admin-only)</span></div>
-                <div><CheckCircle2 size={15} /><span>Ownership and accuracy declarations required before submission</span></div>
-                <div><CheckCircle2 size={15} /><span>Submission creates a locked, immutable version for review</span></div>
+                <div>
+                  <CheckCircle2 size={15} />
+                  <span>
+                    Granular file visibility (Review-team, Public, or
+                    Admin-only)
+                  </span>
+                </div>
+                <div>
+                  <CheckCircle2 size={15} />
+                  <span>
+                    Ownership and accuracy declarations required before
+                    submission
+                  </span>
+                </div>
+                <div>
+                  <CheckCircle2 size={15} />
+                  <span>
+                    Submission creates a locked, immutable version for review
+                  </span>
+                </div>
               </ProcessPoints>
             </ProcessStepContent>
           </ProcessStepCard>
@@ -1253,14 +1357,29 @@ export function AboutPage() {
             <ProcessStepContent>
               <ProcessStepHeader>
                 <ShieldCheck size={20} />
-                <h3>Administrative Review & Expert Assignment (Administrator)</h3>
+                <h3>
+                  Administrative Review & Expert Assignment (Administrator)
+                </h3>
               </ProcessStepHeader>
               <p>
-                System Administrators review the complete submitted version for completeness and assign exactly one approved domain Expert based on sector taxonomy (Agriculture, Health, Energy, Water, ICT, etc.).
+                System Administrators review the complete submitted version for
+                completeness and assign exactly one approved domain Expert based
+                on sector taxonomy (Agriculture, Health, Energy, Water, ICT,
+                etc.).
               </p>
               <ProcessPoints>
-                <div><CheckCircle2 size={15} /><span>Administrative completeness checks prevent premature scoring</span></div>
-                <div><CheckCircle2 size={15} /><span>Direct matching to vetted technical specialists by sector</span></div>
+                <div>
+                  <CheckCircle2 size={15} />
+                  <span>
+                    Administrative completeness checks prevent premature scoring
+                  </span>
+                </div>
+                <div>
+                  <CheckCircle2 size={15} />
+                  <span>
+                    Direct matching to vetted technical specialists by sector
+                  </span>
+                </div>
               </ProcessPoints>
             </ProcessStepContent>
           </ProcessStepCard>
@@ -1273,12 +1392,32 @@ export function AboutPage() {
                 <h3>Technical Criteria Scoring & Feedback (Expert)</h3>
               </ProcessStepHeader>
               <p>
-                The assigned Expert reviews the immutable version, opening technical evidence and supporting materials. They evaluate the submission against active weighted criteria (scored 0 to 5) with qualitative feedback.
+                The assigned Expert reviews the immutable version, opening
+                technical evidence and supporting materials. They evaluate the
+                submission against active weighted criteria (scored 0 to 5) with
+                qualitative feedback.
               </p>
               <ProcessPoints>
-                <div><CheckCircle2 size={15} /><span>Standardized evaluation on feasibility, impact, novelty, and evidence</span></div>
-                <div><CheckCircle2 size={15} /><span>Can request structured revisions or submit a publication recommendation</span></div>
-                <div><CheckCircle2 size={15} /><span>Innovators improve and resubmit directly to the same Expert</span></div>
+                <div>
+                  <CheckCircle2 size={15} />
+                  <span>
+                    Standardized evaluation on feasibility, impact, novelty, and
+                    evidence
+                  </span>
+                </div>
+                <div>
+                  <CheckCircle2 size={15} />
+                  <span>
+                    Can request structured revisions or submit a publication
+                    recommendation
+                  </span>
+                </div>
+                <div>
+                  <CheckCircle2 size={15} />
+                  <span>
+                    Innovators improve and resubmit directly to the same Expert
+                  </span>
+                </div>
               </ProcessPoints>
             </ProcessStepContent>
           </ProcessStepCard>
@@ -1291,11 +1430,26 @@ export function AboutPage() {
                 <h3>Publication & Verified Directory (Administrator)</h3>
               </ProcessStepHeader>
               <p>
-                When an Expert recommends approval, the innovation enters the verified national registry directory. A public-facing immutable record is published while keeping private evidence and contact details securely protected.
+                When an Expert recommends approval, the innovation enters the
+                verified national registry directory. A public-facing immutable
+                record is published while keeping private evidence and contact
+                details securely protected.
               </p>
               <ProcessPoints>
-                <div><CheckCircle2 size={15} /><span>Full audit trail of versions, scores, and evaluation comments</span></div>
-                <div><CheckCircle2 size={15} /><span>Multi-sector indexing across Rwanda's 30 districts and coverage levels</span></div>
+                <div>
+                  <CheckCircle2 size={15} />
+                  <span>
+                    Full audit trail of versions, scores, and evaluation
+                    comments
+                  </span>
+                </div>
+                <div>
+                  <CheckCircle2 size={15} />
+                  <span>
+                    Multi-sector indexing across Rwanda's 30 districts and
+                    coverage levels
+                  </span>
+                </div>
               </ProcessPoints>
             </ProcessStepContent>
           </ProcessStepCard>
@@ -1305,14 +1459,31 @@ export function AboutPage() {
             <ProcessStepContent>
               <ProcessStepHeader>
                 <HeartHandshake size={20} />
-                <h3>Partner Discovery & Consent-Gated Engagement (Investor / Partner)</h3>
+                <h3>
+                  Partner Discovery & Consent-Gated Engagement (Investor /
+                  Partner)
+                </h3>
               </ProcessStepHeader>
               <p>
-                Approved institutional investors and industry partners browse published innovations and send non-binding collaboration proposals (funding, pilot testing, technical assistance).
+                Approved institutional investors and industry partners browse
+                published innovations and send non-binding collaboration
+                proposals (funding, pilot testing, technical assistance).
               </p>
               <ProcessPoints>
-                <div><CheckCircle2 size={15} /><span>Innovator explicitly reviews and consents before email/phone are shared</span></div>
-                <div><CheckCircle2 size={15} /><span>Non-binding framework: funds are never transferred directly on-platform</span></div>
+                <div>
+                  <CheckCircle2 size={15} />
+                  <span>
+                    Innovator explicitly reviews and consents before email/phone
+                    are shared
+                  </span>
+                </div>
+                <div>
+                  <CheckCircle2 size={15} />
+                  <span>
+                    Non-binding framework: funds are never transferred directly
+                    on-platform
+                  </span>
+                </div>
               </ProcessPoints>
             </ProcessStepContent>
           </ProcessStepCard>
@@ -1322,7 +1493,10 @@ export function AboutPage() {
         <AboutSectionTitle>
           <Eyebrow>Role Responsibilities</Eyebrow>
           <h2>Four unified stakeholder workspaces</h2>
-          <p>Each participant has a dedicated workspace tailored to their exact function in the ecosystem.</p>
+          <p>
+            Each participant has a dedicated workspace tailored to their exact
+            function in the ecosystem.
+          </p>
         </AboutSectionTitle>
 
         <WorkspaceGrid>
@@ -1350,7 +1524,9 @@ export function AboutPage() {
             <ul>
               <li>Assignment queue created by System Administrators</li>
               <li>Read-only access to assigned immutable version and files</li>
-              <li>Interactive criteria scoring sheet (0–5) with weighted math</li>
+              <li>
+                Interactive criteria scoring sheet (0–5) with weighted math
+              </li>
               <li>Formal recommendation or structured revision requests</li>
               <li>Historical evaluation log and notification center</li>
             </ul>
@@ -1380,7 +1556,9 @@ export function AboutPage() {
             <ul>
               <li>Account approval queues for Experts and Partners</li>
               <li>Expert assignment to submitted innovation versions</li>
-              <li>Full CRUD for classification taxonomies (sectors, categories)</li>
+              <li>
+                Full CRUD for classification taxonomies (sectors, categories)
+              </li>
               <li>Evaluation criteria version management with weight checks</li>
               <li>PDF summary report generation and printable analytics</li>
             </ul>
@@ -1399,7 +1577,10 @@ export function AboutPage() {
             <ShieldCheck size={24} />
             <div>
               <h3>Immutable Versioning</h3>
-              <p>Submitted versions are locked and frozen to guarantee that review scores reflect the exact evidence evaluated.</p>
+              <p>
+                Submitted versions are locked and frozen to guarantee that
+                review scores reflect the exact evidence evaluated.
+              </p>
             </div>
           </PrincipleCard>
 
@@ -1407,7 +1588,10 @@ export function AboutPage() {
             <Award size={24} />
             <div>
               <h3>Standardized Weighted Criteria</h3>
-              <p>Active evaluation criteria versions (2–12 criteria) ensure consistent, transparent scoring across all sectors.</p>
+              <p>
+                Active evaluation criteria versions (2–12 criteria) ensure
+                consistent, transparent scoring across all sectors.
+              </p>
             </div>
           </PrincipleCard>
 
@@ -1415,7 +1599,10 @@ export function AboutPage() {
             <HeartHandshake size={24} />
             <div>
               <h3>Consent-Controlled Disclosure</h3>
-              <p>Innovator contact details remain confidential until the innovator explicitly accepts a collaboration proposal.</p>
+              <p>
+                Innovator contact details remain confidential until the
+                innovator explicitly accepts a collaboration proposal.
+              </p>
             </div>
           </PrincipleCard>
 
@@ -1423,7 +1610,10 @@ export function AboutPage() {
             <FileText size={24} />
             <div>
               <h3>Non-Binding Financial Safety</h3>
-              <p>Collaborations are informational and non-binding; the platform does not hold funds or enforce financial contracts.</p>
+              <p>
+                Collaborations are informational and non-binding; the platform
+                does not hold funds or enforce financial contracts.
+              </p>
             </div>
           </PrincipleCard>
         </PrincipleGrid>
@@ -1431,10 +1621,16 @@ export function AboutPage() {
         {/* CTA */}
         <AboutCta>
           <h2>Ready to participate in Rwanda's innovation ecosystem?</h2>
-          <p>Whether you are documenting a local solution, evaluating technical merit, or looking to partner, LIDKEP is built for you.</p>
+          <p>
+            Whether you are documenting a local solution, evaluating technical
+            merit, or looking to partner, LIDKEP is built for you.
+          </p>
           <div>
-            <ButtonLink to={user ? `/${roleWorkspace[user.role]}/dashboard` : "/register"}>
-              {user ? "Go to Workspace" : "Create an Account"} <ArrowRight size={16} />
+            <ButtonLink
+              to={user ? `/${roleWorkspace[user.role]}/dashboard` : "/register"}
+            >
+              {user ? "Go to Workspace" : "Create an Account"}{" "}
+              <ArrowRight size={16} />
             </ButtonLink>
             {!user && (
               <ButtonLink to="/login" $variant="secondary">
@@ -2038,7 +2234,11 @@ const ShowcaseFoot = styled.div`
 `;
 
 const ShowcaseCallout = styled.div`
-  background: linear-gradient(135deg, ${palette.greenDark} 0%, ${palette.green} 100%);
+  background: linear-gradient(
+    135deg,
+    ${palette.greenDark} 0%,
+    ${palette.green} 100%
+  );
   color: white;
   border-radius: 20px;
   padding: 32px 28px;
@@ -2299,7 +2499,6 @@ const CardFoot = styled.div`
 `;
 
 const PageSurface = styled.main`
-
   max-width: 1240px;
   margin: auto;
   padding: 55px 24px 90px;
@@ -2346,7 +2545,11 @@ const DetailHero = styled.section<{ $tone: string }>`
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at 82% 20%, rgba(184, 221, 114, 0.26), transparent 26%),
+    radial-gradient(
+      circle at 82% 20%,
+      rgba(184, 221, 114, 0.26),
+      transparent 26%
+    ),
     radial-gradient(circle at 8% 95%, rgba(11, 98, 85, 0.12), transparent 32%),
     ${({ $tone }) =>
       ({ mint: "#eaf5e8", amber: "#fff6e7", blue: "#eef7f9" })[$tone] ||
@@ -3343,7 +3546,6 @@ const AboutCta = styled.div`
 `;
 
 const StatePage = styled.main`
-
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
