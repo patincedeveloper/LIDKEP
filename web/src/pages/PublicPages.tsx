@@ -767,9 +767,7 @@ export function InnovationDetailPage() {
 
             <SupportingDetailSection>
               <SectionHeading>
-                <span>
-                  <Sparkles size={18} />
-                </span>
+                <span></span>
                 <div>
                   <Eyebrow>Inside the innovation</Eyebrow>
                   <h2>Readiness and growth</h2>
@@ -880,7 +878,6 @@ export function InnovationDetailPage() {
                   <Compass size={18} />
                 </span>
                 <div>
-                  <small>At a glance</small>
                   <h2>Innovation snapshot</h2>
                 </div>
               </AsideCardHeader>
@@ -926,8 +923,7 @@ export function InnovationDetailPage() {
                   <Building2 size={18} />
                 </span>
                 <div>
-                  <small>Published by</small>
-                  <h2>About the innovator</h2>
+                  <h2>Published by</h2>
                 </div>
               </AsideCardHeader>
               <Owner>
@@ -944,14 +940,6 @@ export function InnovationDetailPage() {
                 </div>
               </Owner>
             </AsideCard>
-            <Notice>
-              <ShieldCheck size={18} />
-              <p>
-                Publication on LIDKEP is not patent protection or investment
-                advice. Engagement offers are non-binding and funds are never
-                transferred on the platform.
-              </p>
-            </Notice>
           </DetailAside>
         </DetailGrid>
       </DetailPageSurface>
