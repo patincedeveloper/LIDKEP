@@ -3,7 +3,6 @@ import { Algorithm, hash, verify } from '@node-rs/argon2';
 import { prisma } from '../config/database.js';
 import { env } from '../config/env.js';
 import { AppError } from '../lib/http.js';
-import { auditRepository } from '../repositories/audit.repository.js';
 import { sessionsRepository } from '../repositories/sessions.repository.js';
 import { usersRepository } from '../repositories/users.repository.js';
 
@@ -18,7 +17,20 @@ const argonOptions = {
 export const hashPassword = (password) => hash(password, argonOptions);
 export const hashSessionToken = (token) => createHash('sha256').update(token).digest('hex');
 
+export function isProfileComplete(profile) {
+  return Boolean(
+    profile?.displayName?.trim() && profile?.identificationType?.trim() &&
+    profile?.identificationNumber?.trim() && profile?.privatePhone?.trim() &&
+    profile?.educationLevel?.trim() && profile?.province?.trim() &&
+    profile?.district?.trim() && profile?.administrativeSector?.trim() &&
+    profile?.occupation?.trim()
+  );
+}
+
 export function serializeUser(user) {
+  const approvalStatus = user.role.code === 'SYSTEM_ADMINISTRATOR'
+    ? 'APPROVED'
+    : user.verificationRequests?.[0]?.status ?? (user.status === 'ACTIVE' ? 'APPROVED' : 'DRAFT');
   return {
     id: user.id,
     email: user.email,
@@ -29,7 +41,9 @@ export function serializeUser(user) {
     district: user.profile?.district ?? '',
     verified: Boolean(user.emailVerifiedAt),
     mfaEnabled: user.mfaEnabled,
-    mustChangePassword: user.mustChangePassword
+    mustChangePassword: user.mustChangePassword,
+    profileComplete: user.role.code === 'SYSTEM_ADMINISTRATOR' || isProfileComplete(user.profile),
+    approvalStatus
   };
 }
 
@@ -52,7 +66,8 @@ export async function register(input, context) {
   if (existing) throw new AppError(409, 'EMAIL_ALREADY_REGISTERED', 'An account already exists for this email.');
   const role = await prisma.role.findUnique({ where: { code: input.role } });
   if (!role || !role.isActive) throw new AppError(422, 'ROLE_UNAVAILABLE', 'The selected account type is unavailable.');
-  const status = ['EXPERT', 'INVESTOR_PARTNER'].includes(input.role) ? 'PENDING_APPROVAL' : 'ACTIVE';
+  const isInnovator = input.role === 'INNOVATOR';
+  const status = isInnovator ? 'ACTIVE' : 'PENDING_APPROVAL';
   const passwordHash = await hashPassword(input.password);
   return prisma.$transaction(async (tx) => {
     const user = await usersRepository.create({
@@ -63,22 +78,21 @@ export async function register(input, context) {
       emailVerifiedAt: new Date(),
       profile: {
         create: {
-          displayName: input.displayName,
-          organization: input.organization || null,
-          district: input.district || null
+          displayName: input.displayName
         }
       }
     }, tx);
-    const token = status === 'ACTIVE' ? await issueSession(user.id, context, tx) : null;
-    await auditRepository.create({
-      actorId: user.id,
-      action: 'ACCOUNT_REGISTERED',
-      entityType: 'User',
-      entityId: user.id,
-      requestId: context.requestId,
-      metadata: { role: input.role, status }
-    }, tx);
-    return { user: serializeUser(user), token };
+    await tx.verificationRequest.create({
+      data: {
+        userId: user.id,
+        requestedRole: input.role,
+        status: isInnovator ? 'APPROVED' : 'DRAFT',
+        ...(isInnovator ? { submittedAt: new Date(), decidedAt: new Date() } : {})
+      }
+    });
+    const token = await issueSession(user.id, context, tx);
+    const hydrated = await usersRepository.findById(user.id, tx);
+    return { user: serializeUser(hydrated), token, requiresApproval: !isInnovator };
   });
 }
 
@@ -90,31 +104,15 @@ export async function login(input, context) {
   }
   const valid = await verify(user.passwordHash, input.password);
   if (!valid) throw new AppError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
-  if (user.status !== 'ACTIVE') throw new AppError(403, 'ACCOUNT_NOT_ACTIVE', 'This account is not active.');
-  const token = await prisma.$transaction(async (tx) => {
-    const issued = await issueSession(user.id, context, tx);
-    await auditRepository.create({
-      actorId: user.id,
-      action: 'SESSION_CREATED',
-      entityType: 'Session',
-      requestId: context.requestId
-    }, tx);
-    return issued;
-  });
+  if (!['ACTIVE', 'PENDING_APPROVAL'].includes(user.status)) {
+    throw new AppError(403, 'ACCOUNT_NOT_ACTIVE', 'This account is not active.');
+  }
+  const token = await issueSession(user.id, context);
   return { user: serializeUser(user), token };
 }
 
 export async function logout(session, requestId) {
-  await prisma.$transaction(async (tx) => {
-    await sessionsRepository.revoke(session.id, 'LOGOUT', tx);
-    await auditRepository.create({
-      actorId: session.userId,
-      action: 'SESSION_REVOKED',
-      entityType: 'Session',
-      entityId: session.id,
-      requestId
-    }, tx);
-  });
+  await sessionsRepository.revoke(session.id, 'LOGOUT');
 }
 
 export async function changePassword(user, input, requestId) {
@@ -128,12 +126,5 @@ export async function changePassword(user, input, requestId) {
       tokenVersion: { increment: 1 }
     }, tx);
     await sessionsRepository.revokeAllForUser(user.id, 'PASSWORD_CHANGED', tx);
-    await auditRepository.create({
-      actorId: user.id,
-      action: 'PASSWORD_CHANGED',
-      entityType: 'User',
-      entityId: user.id,
-      requestId
-    }, tx);
   });
 }

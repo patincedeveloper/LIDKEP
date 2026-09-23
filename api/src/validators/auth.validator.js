@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fullNameSchema } from './common.validator.js';
 
 const password = z.string()
   .min(12)
@@ -17,10 +18,8 @@ const request = (body) => z.object({
 export const registerSchema = request(z.object({
   email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
   password,
-  displayName: z.string().trim().min(2).max(120),
-  organization: z.string().trim().max(160).optional(),
-  district: z.string().trim().max(100).optional(),
-  role: z.enum(['INNOVATOR', 'EXPERT', 'INVESTOR_PARTNER', 'PUBLIC_USER'])
+  displayName: fullNameSchema,
+  role: z.enum(['INNOVATOR', 'EXPERT', 'INVESTOR_PARTNER'])
 }).strict());
 
 export const loginSchema = request(z.object({

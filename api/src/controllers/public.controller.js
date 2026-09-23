@@ -7,6 +7,7 @@ import {
   getPublicTaxonomies,
   listPublicInnovations,
 } from '../services/public.service.js';
+import { getPublicEvidenceDownload } from '../services/innovations.service.js';
 
 export async function listInnovations(req, res) {
   const { items, total } = await listPublicInnovations(req.validated.query);
@@ -16,6 +17,11 @@ export async function listInnovations(req, res) {
 
 export async function showInnovation(req, res) {
   res.json(successResponse(req, await getPublicInnovation(req.validated.params.slug)));
+}
+
+export async function downloadEvidence(req, res) {
+  const result = await getPublicEvidenceDownload(req.validated.params.slug, req.validated.params.evidenceId);
+  res.download(result.filePath, result.evidence.originalName);
 }
 
 export async function statistics(req, res) {

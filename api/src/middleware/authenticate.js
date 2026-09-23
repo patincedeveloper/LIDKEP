@@ -12,7 +12,9 @@ export async function authenticate(req, _res, next) {
     if (!session || session.revokedAt || session.expiresAt <= now || session.idleExpiresAt <= now) {
       throw new AppError(401, 'SESSION_EXPIRED', 'Your session has expired. Sign in again.');
     }
-    if (session.user.status !== 'ACTIVE') throw new AppError(403, 'ACCOUNT_NOT_ACTIVE', 'This account is not active.');
+    if (!['ACTIVE', 'PENDING_APPROVAL'].includes(session.user.status)) {
+      throw new AppError(403, 'ACCOUNT_NOT_ACTIVE', 'This account is not active.');
+    }
     req.session = session;
     req.user = session.user;
     await sessionsRepository.touch(session.id, new Date(Date.now() + env.SESSION_IDLE_HOURS * 3600000));

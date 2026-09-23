@@ -1,30 +1,53 @@
-# Route inventory
+# LIDKEP route inventory
 
-## Public and identity
+## Public website
 
-- `/`, `/discover`, `/innovations/:slug`, `/statistics`, `/about`
-- `/login`, `/register`, `/forgot-password`, `/demo`
-- `/forbidden`, `/session-expired`, `/offline`, `/maintenance`, unmatched 404
+- `/` — home
+- `/discover` — published innovation directory and filters
+- `/innovations/:slug` — stable public innovation detail
+- `/statistics` — public aggregate statistics
+- `/about` — platform process and actor responsibilities
+- `/login`, `/register`, `/forgot-password`, `/change-password` — identity pages
+- `/forbidden`, `/session-expired`, `/offline`, `/maintenance`, unmatched 404 — system states
 
-## Innovator
+## Innovator — Phase 1 functional
 
-- `/innovator/dashboard`, `/innovator/innovations`, `/innovator/innovations/new`, `/innovator/innovations/:id`
-- `/innovator/revisions`, `/innovator/reviews`, `/innovator/engagements`, `/innovator/engagements/:id`
-- `/innovator/milestones`, `/innovator/notifications`, `/innovator/profile`
+- `/innovator/dashboard` — owned-record and notification summary
+- `/innovator/innovations` — owned innovations
+- `/innovator/innovations/new` — create draft
+- `/innovator/innovations/:id` — edit, upload evidence, and submit
+- `/innovator/revisions` and `/innovator/revisions/:id` — versioned Expert feedback, responses, and revise action
+- `/innovator/collaborations` — Partner requests and Innovator decisions
+- `/innovator/notifications` — workflow notifications
+- `/innovator/profile` — profile information
 
-## Expert
+## System Administrator — Phase 1 functional
 
-- `/expert/dashboard`, `/expert/assignments`, `/expert/reviews`, `/expert/reviews/:assignmentId`
-- `/expert/revisions`, `/expert/history`, `/expert/notifications`, `/expert/profile`
+- `/admin/dashboard` — live prototype overview
+- `/admin/users` — account status management
+- `/admin/verifications` — role registration decisions
+- `/admin/innovations` — submitted innovation queue and workflow monitoring
+- `/admin/innovations/:id` — detail-first review, one-time Expert assignment, review history, and archive
+- `/admin/taxonomies` — sectors and classification lists
+- `/admin/criteria` — variable-count criteria builder, version history, and active-version switching
+- `/admin/reports` — prototype database summary
+- `/admin/settings` — prototype settings
+- `/admin/notifications` — workflow notifications
 
-## Investor / Partner
+## Expert — functional
 
-- `/partner/dashboard`, `/partner/discover`, `/partner/opportunities`
-- `/partner/engagements`, `/partner/engagements/new`, `/partner/engagements/:id`
-- `/partner/notifications`, `/partner/profile`
+- `/expert/dashboard` — assignment and notification summary
+- `/expert/assignments` — assigned review queue
+- `/expert/assignments/:id` — immediate immutable submission review, scoring, comments, revision request, approval, and round history
+- `/expert/history` — submitted evaluation history
+- `/expert/notifications` — workflow notifications
+- `/expert/profile` — profile completion, review submission, and account state
 
-## Administrator
+## Investor / Industry Partner — functional
 
-- `/admin/dashboard`, `/admin/users`, `/admin/verifications`, `/admin/assignments`
-- `/admin/decisions`, `/admin/publication`, `/admin/publication/:innovationId`, `/admin/moderation`
-- `/admin/taxonomies`, `/admin/criteria`, `/admin/reports`, `/admin/audit`, `/admin/settings`
+- `/partner/dashboard` — published catalogue and opportunity summary
+- `/partner/discover` — published innovation search
+- `/partner/discover/:id` — published detail and structured request entry
+- `/partner/opportunities` — request status and consented contact details
+- `/partner/notifications` — workflow notifications
+- `/partner/profile` — profile completion, review submission, and account state

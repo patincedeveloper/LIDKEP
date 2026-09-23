@@ -165,13 +165,14 @@ model User {
   expertAssignments   ExpertAssignment[] @relation("AssignedExpert")
   assignmentsMade     ExpertAssignment[] @relation("AssignmentAdministrator")
   reviews             Review[] @relation("ReviewReviewer")
+  innovationAdministratorReviews InnovationAdministratorReview[] @relation("InnovationAdministratorReviewer")
   engagements         Engagement[] @relation("EngagementPartner")
   engagementConsents  EngagementConsent[]
   notifications       Notification[]
-  auditLogs            AuditLog[] @relation("AuditActor")
   criteriaVersions    EvaluationCriteriaVersion[] @relation("CriteriaCreator")
   sessions             Session[]
   passwordResetTokens PasswordResetToken[]
+  settingsUpdated     PlatformSetting[] @relation("SettingUpdater")
 
   @@index([roleId, status])
 }
@@ -181,12 +182,18 @@ model UserProfile {
   userId              String     @unique @db.Uuid
   displayName         String
   organization        String?
-  biography           String?
+  identificationType  String?
+  identificationNumber String?    @unique
+  educationLevel      String?
+  province            String?
   district            String?
+  administrativeSector String?
+  occupation          String?
+  yearsOfExperience   Int?
   preferredLanguage   String     @default("en")
   publicProfile       Boolean    @default(false)
   privateContactEmail String?
-  privatePhone        String?
+  privatePhone        String?     @unique
   contactPreference   String?
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
@@ -199,6 +206,8 @@ model VerificationRequest {
   requestedRole   RoleCode
   status          VerificationStatus @default(DRAFT)
   submittedAt     DateTime?
+  reviewedAt      DateTime?
+  reviewedById    String?            @db.Uuid
   decidedAt       DateTime?
   decidedById     String?            @db.Uuid
   decisionReason  String?
@@ -226,6 +235,8 @@ model Innovation {
   publishedVersion   InnovationVersion? @relation("PublishedInnovationVersion", fields: [publishedVersionId], references: [id], onDelete: Restrict)
   milestones         Milestone[]
   engagements        Engagement[]
+  expertAssignment   ExpertAssignment?
+  administratorReview InnovationAdministratorReview?
 
   @@index([ownerId, status])
   @@index([status, publishedAt])
@@ -244,8 +255,15 @@ model InnovationVersion {
   category             String
   district             String
   maturity             String
+  impactArea           String     @default("")
   impact               String
+  novelty              String     @default("")
+  currentEvidence      String     @default("")
+  implementationPlan   String     @default("")
+  scalability          String     @default("")
+  sustainability       String     @default("")
   supportNeeded        String
+  supportingLinks      Json       @default("[]")
   organizationSnapshot String?
   ownerDisplaySnapshot String?
   metrics              Json       @default("[]")
@@ -258,6 +276,7 @@ model InnovationVersion {
   updatedAt            DateTime   @updatedAt
   innovation           Innovation @relation("InnovationVersions", fields: [innovationId], references: [id], onDelete: Cascade)
   publishedFor         Innovation? @relation("PublishedInnovationVersion")
+  administratorReview InnovationAdministratorReview?
   evidenceFiles        EvidenceFile[]
   assignments          ExpertAssignment[]
   reviews              Review[]
@@ -266,6 +285,19 @@ model InnovationVersion {
 
   @@unique([innovationId, versionNumber])
   @@index([innovationId, submittedAt])
+}
+
+model InnovationAdministratorReview {
+  id           String   @id @default(uuid()) @db.Uuid
+  innovationId String   @unique @db.Uuid
+  versionId    String   @unique @db.Uuid
+  reviewedById String   @db.Uuid
+  reviewedAt   DateTime @default(now())
+  innovation   Innovation @relation(fields: [innovationId], references: [id], onDelete: Cascade)
+  version      InnovationVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  reviewedBy   User @relation("InnovationAdministratorReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+
+  @@index([reviewedById, reviewedAt])
 }
 
 model EvidenceFile {
@@ -311,6 +343,7 @@ model Milestone {
 
 model ExpertAssignment {
   id            String           @id @default(uuid()) @db.Uuid
+  innovationId  String           @unique @db.Uuid
   versionId     String           @db.Uuid
   expertId      String           @db.Uuid
   assignedById  String           @db.Uuid
@@ -320,10 +353,11 @@ model ExpertAssignment {
   completedAt   DateTime?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
+  innovation    Innovation       @relation(fields: [innovationId], references: [id], onDelete: Restrict)
   version       InnovationVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
   expert        User             @relation("AssignedExpert", fields: [expertId], references: [id], onDelete: Restrict)
   assignedBy    User             @relation("AssignmentAdministrator", fields: [assignedById], references: [id], onDelete: Restrict)
-  review        Review?
+  reviews       Review[]
 
   @@unique([versionId, expertId])
   @@index([expertId, status, dueAt])
@@ -331,7 +365,7 @@ model ExpertAssignment {
 
 model Review {
   id                String         @id @default(uuid()) @db.Uuid
-  assignmentId      String         @unique @db.Uuid
+  assignmentId      String         @db.Uuid
   versionId         String         @db.Uuid
   reviewerId        String         @db.Uuid
   criteriaVersionId String         @db.Uuid
@@ -349,6 +383,7 @@ model Review {
   scores            ReviewCriterionScore[]
   revisionRequests  RevisionRequest[]
 
+  @@unique([assignmentId, versionId])
   @@index([versionId, status])
 }
 
@@ -388,6 +423,7 @@ model RevisionRequest {
 
 model Engagement {
   id                     String           @id @default(uuid()) @db.Uuid
+  requestKey             String?          @unique @db.VarChar(80)
   innovationId           String           @db.Uuid
   innovationVersionId    String           @db.Uuid
   partnerId              String           @db.Uuid
@@ -435,22 +471,6 @@ model Notification {
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt, createdAt])
-}
-
-model AuditLog {
-  id         String   @id @default(uuid()) @db.Uuid
-  actorId    String?  @db.Uuid
-  action     String
-  entityType String
-  entityId   String?
-  requestId  String   @db.Uuid
-  metadata   Json?
-  createdAt  DateTime @default(now())
-  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
-
-  @@index([createdAt])
-  @@index([actorId, createdAt])
-  @@index([entityType, entityId])
 }
 
 model Taxonomy {
@@ -529,4 +549,12 @@ model PasswordResetToken {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
+}
+
+model PlatformSetting {
+  key         String   @id
+  value       Json
+  updatedById String?  @db.Uuid
+  updatedAt   DateTime @updatedAt
+  updatedBy   User?    @relation("SettingUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
 }

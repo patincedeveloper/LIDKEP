@@ -2,7 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import styled from '@emotion/styled';
 import { CheckCircle2 } from 'lucide-react';
 import { usePlatform } from './api';
-import { AboutPage, AuthPage, ChangePasswordPage, DirectoryPage, HomePage, InnovationDetailPage, StatisticsPage, SystemStatePage } from './pages/PublicPages';
+import { AboutPage, AuthPage, ChangePasswordPage, DirectoryPage, HomePage, InnovationDetailPage, SystemStatePage } from './pages/PublicPages';
 import { WorkspacePage } from './pages/WorkspacePages';
 import { ErrorScreen, LoadingScreen } from './ui';
 import { palette } from './styles';
@@ -16,8 +16,8 @@ export function App() {
       <Route path="/" element={<HomePage/>}/>
       <Route path="/discover" element={<DirectoryPage/>}/>
       <Route path="/innovations/:slug" element={<InnovationDetailPage/>}/>
-      <Route path="/statistics" element={<StatisticsPage/>}/>
       <Route path="/about" element={<AboutPage/>}/>
+
       <Route path="/login" element={<AuthPage mode="login"/>}/>
       <Route path="/register" element={<AuthPage mode="register"/>}/>
       <Route path="/forgot-password" element={<AuthPage mode="reset"/>}/>

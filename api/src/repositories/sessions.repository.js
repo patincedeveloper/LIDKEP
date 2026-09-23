@@ -7,7 +7,11 @@ export const sessionsRepository = {
   findActiveByTokenHash(tokenHash, client = prisma) {
     return client.session.findUnique({
       where: { tokenHash },
-      include: { user: { include: { role: true, profile: true } } }
+      include: {
+        user: {
+          include: { role: true, profile: true, verificationRequests: { orderBy: { createdAt: 'desc' }, take: 1 } }
+        }
+      }
     });
   },
   touch(id, idleExpiresAt, client = prisma) {

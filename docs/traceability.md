@@ -1,6 +1,6 @@
 # LIDKEP PRD traceability
 
-This matrix describes the demo-complete frontend and API-contract implementation. Database-dependent acceptance remains pending PostgreSQL.
+This matrix describes the PostgreSQL-backed functional prototype and its four-role lifecycle coverage.
 
 | PRD IDs | Evidence |
 | --- | --- |
@@ -11,16 +11,20 @@ This matrix describes the demo-complete frontend and API-contract implementation
 | DIS-01 - DIS-05 | Public API filtering, combined UI filters, public-only detail serializer, aggregate statistics, stable `/innovations/:slug` routes |
 | ENG-01 - ENG-07 | Saved opportunities, structured engagement types, participant actions, consent-based contact language, status tracking, safety/reporting controls |
 | NTF-01 | Notification centre and realistic event fixtures |
-| ADM-01 - ADM-05 | Users, verification, taxonomy, criteria, publication, moderation, reports, settings and audit pages |
+| ADM-01 - ADM-05 | Users, verification, taxonomy, criteria, publication, moderation, reports and settings pages |
 | BR-01 | Exact five-role assertion in `api/src/mockData.test.ts` |
 | BR-03 - BR-08 | Role-specific routes and public-only API detail route; unpublished slugs return 404 |
 | BR-12 / ENG-06 | Non-binding/no-funds notices before and within engagement flows |
 | NFR-03 - NFR-05, NFR-09 | Responsive shell from 360px, semantic fields, focus states, reduced motion, PWA manifest/offline state, language setting foundation |
 
-## PostgreSQL-dependent items
+## Verified PostgreSQL items
 
 - Prisma schema and deterministic migrations.
 - Argon2id seed credential hashing and repeatable database seeding.
-- Server-enforced sessions, CSRF, TOTP MFA, durable authorization policies and audit persistence.
-- Object storage, signed files, malware scan integration, queues and email delivery.
-- Concurrency/transaction tests, backup/restore and production acceptance suite.
+- Server-enforced sessions, account approval gates, ownership/role authorization, validated transitions, transactions, and notifications.
+- Database-backed integration coverage for Innovator, System Administrator, Expert, and Investor / Industry Partner.
+
+## Still outside the prototype
+
+- CSRF hardening beyond same-site session cookies, TOTP MFA, object storage, malware scanning, queues, and email delivery.
+- Backup/restore rehearsal and production deployment acceptance.

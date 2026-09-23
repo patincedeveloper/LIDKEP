@@ -1,5 +1,6 @@
 import { prisma } from '../config/database.js';
 import { AppError } from '../lib/http.js';
+import { educationLevels, rwandaLocations } from '../data/rwanda-locations.js';
 
 const taxonomyKeys = {
   SECTOR: 'sectors',
@@ -11,6 +12,10 @@ const taxonomyKeys = {
 
 export function serializeInnovation(innovation, version = innovation.publishedVersion ?? innovation.versions?.[0]) {
   if (!version) return null;
+  const evidenceFiles = Array.from(new Map(
+    (innovation.versions?.flatMap((item) => item.evidenceFiles ?? []) ?? version.evidenceFiles ?? [])
+      .map((file) => [file.id, file])
+  ).values());
   return {
     id: innovation.id,
     slug: innovation.slug,
@@ -23,9 +28,15 @@ export function serializeInnovation(innovation, version = innovation.publishedVe
     category: version.category,
     district: version.district,
     maturity: version.maturity,
+    impactArea: version.impactArea,
     status: innovation.status,
     impact: version.impact,
+    novelty: version.novelty,
+    implementationPlan: version.implementationPlan,
+    scalability: version.scalability,
+    sustainability: version.sustainability,
     supportNeeded: version.supportNeeded,
+    supportingLinks: Array.isArray(version.supportingLinks) ? version.supportingLinks : [],
     owner: version.ownerDisplaySnapshot ?? 'LIDKEP innovator',
     organization: version.organizationSnapshot ?? '',
     publishedAt: innovation.publishedAt?.toISOString() ?? '',
@@ -34,7 +45,15 @@ export function serializeInnovation(innovation, version = innovation.publishedVe
     views: 0,
     saves: 0,
     imageTone: 'mint',
-    evidence: [],
+    evidence: evidenceFiles.map((file) => ({
+      id: file.id,
+      name: file.originalName,
+      mimeType: file.mimeType,
+      sizeBytes: String(file.sizeBytes),
+      visibility: file.visibility,
+      scanStatus: file.scanStatus,
+      createdAt: file.createdAt.toISOString()
+    })),
     metrics: Array.isArray(version.metrics) ? version.metrics : [],
     milestones: (innovation.milestones ?? []).map((item) => ({
       title: item.title,
@@ -67,7 +86,15 @@ export async function listPublicInnovations(filters) {
     prisma.innovation.count({ where }),
     prisma.innovation.findMany({
       where,
-      include: { publishedVersion: true, milestones: { where: { visibility: 'PUBLIC' } } },
+      include: {
+        publishedVersion: true,
+        versions: {
+          where: { immutableAt: { not: null } },
+          include: { evidenceFiles: { where: { visibility: 'PUBLIC', scanStatus: 'CLEAN' }, orderBy: { createdAt: 'desc' } } },
+          orderBy: { versionNumber: 'desc' }
+        },
+        milestones: { where: { visibility: 'PUBLIC' } }
+      },
       orderBy: { publishedAt: 'desc' },
       skip: (filters.page - 1) * filters.pageSize,
       take: filters.pageSize
@@ -79,7 +106,15 @@ export async function listPublicInnovations(filters) {
 export async function getPublicInnovation(slug) {
   const innovation = await prisma.innovation.findFirst({
     where: { slug, status: 'PUBLISHED', publishedVersionId: { not: null } },
-    include: { publishedVersion: true, milestones: { where: { visibility: 'PUBLIC' } } }
+    include: {
+      publishedVersion: true,
+      versions: {
+        where: { immutableAt: { not: null } },
+        include: { evidenceFiles: { where: { visibility: 'PUBLIC', scanStatus: 'CLEAN' }, orderBy: { createdAt: 'desc' } } },
+        orderBy: { versionNumber: 'desc' }
+      },
+      milestones: { where: { visibility: 'PUBLIC' } }
+    }
   });
   if (!innovation) throw new AppError(404, 'INNOVATION_NOT_FOUND', 'The published innovation was not found.');
   return serializeInnovation(innovation);
@@ -111,7 +146,10 @@ export async function getPublicTaxonomies() {
     where: { isActive: true },
     orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }]
   });
-  const result = { sectors: [], categories: [], districts: [], maturityLevels: [], impactAreas: [] };
+  const result = {
+    sectors: [], categories: [], districts: [], maturityLevels: [], impactAreas: [],
+    educationLevels, locations: rwandaLocations
+  };
   for (const item of records) {
     const key = taxonomyKeys[item.type];
     if (key) result[key].push(item.label);

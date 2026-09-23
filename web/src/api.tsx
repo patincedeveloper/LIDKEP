@@ -1,39 +1,82 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import type { Account, PlatformData, Role } from './types';
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import type { Account, PlatformData, Role } from "./types";
 
 type RegisterInput = {
   email: string;
   password: string;
   displayName: string;
-  organization?: string;
-  district?: string;
-  role: Exclude<Role, 'SYSTEM_ADMINISTRATOR'>;
+  role: Exclude<Role, "SYSTEM_ADMINISTRATOR">;
 };
+
+export type ApiFieldError = { field: string; message: string; code?: string };
+
+export class ApiRequestError extends Error {
+  code: string;
+  fieldErrors: ApiFieldError[];
+  requestId?: string;
+
+  constructor(
+    message: string,
+    code = "REQUEST_FAILED",
+    fieldErrors: ApiFieldError[] = [],
+    requestId?: string,
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.code = code;
+    this.fieldErrors = fieldErrors.map((item) => ({
+      ...item,
+      field: item.field.replace(/^(body|params|query)\./, ""),
+    }));
+    this.requestId = requestId;
+  }
+}
 
 type PlatformContextValue = {
   data: PlatformData | null;
   user: Account | null;
-  role: Role;
+  role: Role | null;
   loading: boolean;
   error: string;
   toast: string;
   notify: (message: string) => void;
   login: (email: string, password: string) => Promise<Account>;
-  register: (input: RegisterInput) => Promise<{ user: Account; requiresApproval: boolean }>;
-  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  register: (
+    input: RegisterInput,
+  ) => Promise<{ user: Account; requiresApproval: boolean }>;
+  changePassword: (
+    currentPassword: string,
+    newPassword: string,
+  ) => Promise<void>;
   logout: () => Promise<void>;
+  refreshWorkspace: () => Promise<void>;
+  request: <T = unknown>(path: string, options?: RequestInit) => Promise<T>;
 };
+
 
 const PlatformContext = createContext<PlatformContextValue | null>(null);
 
-async function apiRequest(path: string, options: RequestInit = {}) {
+export async function apiRequest(path: string, options: RequestInit = {}) {
+  const isFormData = options.body instanceof FormData;
   const response = await fetch(path, {
-    credentials: 'include',
-    headers: { 'content-type': 'application/json', ...options.headers },
-    ...options
+    credentials: "include",
+    headers: {
+      ...(isFormData ? {} : { "content-type": "application/json" }),
+      ...options.headers,
+    },
+    ...options,
   });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error?.message ?? 'The request could not be completed.');
+  if (!response.ok) {
+    throw new ApiRequestError(
+      payload?.error?.fieldErrors?.[0]?.message ??
+        payload?.error?.message ??
+        "The request could not be completed.",
+      payload?.error?.code,
+      payload?.error?.fieldErrors,
+      payload?.error?.requestId,
+    );
+  }
   return payload.data;
 }
 
@@ -41,21 +84,35 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<PlatformData | null>(null);
   const [user, setUser] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [toast, setToast] = useState('');
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
 
   const loadAuthenticatedData = async () => {
-    const workspace = await apiRequest('/api/v1/auth/bootstrap');
+    const [workspace, identity] = await Promise.all([
+      apiRequest("/api/v1/auth/bootstrap"),
+      apiRequest("/api/v1/auth/me"),
+    ]);
     setData(workspace);
+    setUser(identity.user);
   };
 
   useEffect(() => {
     Promise.all([
-      apiRequest('/api/v1/public/bootstrap'),
-      apiRequest('/api/v1/auth/me').catch(() => null)
+      apiRequest("/api/v1/public/bootstrap"),
+      apiRequest("/api/v1/auth/me").catch(() => null),
     ])
       .then(async ([publicData, identity]) => {
-        setData({ ...publicData, users: [], assignments: [], reviews: [], revisions: [], engagements: [], notifications: [], verifications: [], auditLogs: [], criteria: [] });
+        setData({
+          ...publicData,
+          users: [],
+          assignments: [],
+          reviews: [],
+          revisions: [],
+          engagements: [],
+          notifications: [],
+          verifications: [],
+          criteria: [],
+        });
         if (identity?.user) {
           setUser(identity.user);
           await loadAuthenticatedData();
@@ -66,9 +123,9 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const result = await apiRequest('/api/v1/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
+    const result = await apiRequest("/api/v1/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
     });
     setUser(result.user);
     await loadAuthenticatedData();
@@ -76,56 +133,88 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
   };
 
   const register = async (input: RegisterInput) => {
-    const result = await apiRequest('/api/v1/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(input)
+    const result = await apiRequest("/api/v1/auth/register", {
+      method: "POST",
+      body: JSON.stringify(input),
     });
-    if (!result.requiresApproval) {
-      setUser(result.user);
-      await loadAuthenticatedData();
-    }
+    setUser(result.user);
+    await loadAuthenticatedData();
     return result;
   };
 
   const logout = async () => {
-    await apiRequest('/api/v1/auth/logout', { method: 'POST', body: '{}' });
+    await apiRequest("/api/v1/auth/logout", { method: "POST", body: "{}" });
     setUser(null);
-    const publicData = await apiRequest('/api/v1/public/bootstrap');
-    setData({ ...publicData, users: [], assignments: [], reviews: [], revisions: [], engagements: [], notifications: [], verifications: [], auditLogs: [], criteria: [] });
+    const publicData = await apiRequest("/api/v1/public/bootstrap");
+    setData({
+      ...publicData,
+      users: [],
+      assignments: [],
+      reviews: [],
+      revisions: [],
+      engagements: [],
+      notifications: [],
+      verifications: [],
+      criteria: [],
+    });
   };
 
-  const changePassword = async (currentPassword: string, newPassword: string) => {
-    await apiRequest('/api/v1/auth/change-password', {
-      method: 'POST',
-      body: JSON.stringify({ currentPassword, newPassword })
+  const changePassword = async (
+    currentPassword: string,
+    newPassword: string,
+  ) => {
+    await apiRequest("/api/v1/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ currentPassword, newPassword }),
     });
     setUser(null);
-    const publicData = await apiRequest('/api/v1/public/bootstrap');
-    setData({ ...publicData, users: [], assignments: [], reviews: [], revisions: [], engagements: [], notifications: [], verifications: [], auditLogs: [], criteria: [] });
+    const publicData = await apiRequest("/api/v1/public/bootstrap");
+    setData({
+      ...publicData,
+      users: [],
+      assignments: [],
+      reviews: [],
+      revisions: [],
+      engagements: [],
+      notifications: [],
+      verifications: [],
+      criteria: [],
+    });
   };
 
   const notify = (message: string) => {
     setToast(message);
-    window.setTimeout(() => setToast(''), 3200);
+    window.setTimeout(() => setToast(""), 3200);
   };
-  const value = useMemo(() => ({
-    data,
-    user,
-    role: user?.role ?? 'PUBLIC_USER',
-    loading,
-    error,
-    toast,
-    notify,
-    login,
-    register,
-    changePassword,
-    logout
-  }), [data, user, loading, error, toast]);
-  return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>;
+  const value = useMemo(
+    () => ({
+      data,
+      user,
+      role: user?.role ?? null,
+
+      loading,
+      error,
+      toast,
+      notify,
+      login,
+      register,
+      changePassword,
+      logout,
+      refreshWorkspace: loadAuthenticatedData,
+      request: apiRequest,
+    }),
+    [data, user, loading, error, toast],
+  );
+  return (
+    <PlatformContext.Provider value={value}>
+      {children}
+    </PlatformContext.Provider>
+  );
 }
 
 export function usePlatform() {
   const value = useContext(PlatformContext);
-  if (!value) throw new Error('usePlatform must be used inside PlatformProvider');
+  if (!value)
+    throw new Error("usePlatform must be used inside PlatformProvider");
   return value;
 }
